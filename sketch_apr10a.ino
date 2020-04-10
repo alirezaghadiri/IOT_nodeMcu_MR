@@ -29,7 +29,7 @@ struct NetWorkDT
 IPAddress IP(192, 168, 1, 200);     //ESP static ip
 IPAddress gateway(192, 168, 1, 1);  //IP Address of your WiFi Router (Gateway)
 IPAddress subnet(255, 255, 255, 0); //Subnet mask
-IPAddress dns(8, 8, 8, 8); 
+IPAddress dns(8, 8, 8, 8);
 NetWorkDT network;
 
 void setup()
@@ -40,13 +40,14 @@ void setup()
   Serial.println("Wellcome");
   Serial.println("Booting Sketch...");
   Serial.println("VERSION 2");
-  network.Ap_IP=IP;
-  network.Ap_Gateway=gateway;
-  network.Ap_Subnet=subnet;
-  network.AS_Dns=dns;
+  network.AS_IP = IP;
+  network.AS_Gateway = gateway;
+  network.AS_Subnet = subnet;
+  network.AS_Dns = dns;
+  network.AS_Dhcp = false;
 
-  network.AS_Ssid="D-Link";
-  network.AS_Password="SL2580617418@sh";
+  network.AS_Ssid = "D-Link";
+  network.AS_Password = "SL2580617418@sh";
 
   Run_station();
 }
@@ -59,54 +60,58 @@ bool Run_station()
 {
   digitalWrite(2, 0);
   Serial.println("run the wifi to mode Station");
-  if (network.AS_Password != NULL)
-    WiFi.begin(network.AS_Ssid);
+    ESP.eraseConfig();
+      WiFi.setAutoConnect(false);
+      WiFi.disconnect(true);
+      WiFi.hostname("IOT");
+      WiFi.mode(WIFI_STA);
+  if (network.AS_Password == NULL)
+    WiFi.begin(network.AS_Ssid.c_str());
   else
-    WiFi.begin(network.AS_Ssid, network.AP_Password);
-
+    WiFi.begin(network.AS_Ssid.c_str(), network.AS_Password.c_str());
   if (!network.AS_Dhcp)
     WiFi.config(network.AS_IP, network.AS_Dns, network.AS_Gateway, network.AS_Subnet);
-  WiFi.setAutoConnect(true);
-  WiFi.hostname("IOT Devi");
-  WiFi.mode(WIFI_STA);
   Serial.print("Conecting to Modem");
   int timeout = 0;
-  bool state;
+  bool state = true;
 
-  do
+  while (WiFi.status() != WL_CONNECTED || timeout == 30)
   {
     Serial.print(".");
     if (WiFi.status() == WL_NO_SSID_AVAIL)
     {
       Serial.println("WL_NO_SSID_AVAIL");
-      return false;
+      state = false;
+      break;
     }
     if (WiFi.status() == WL_CONNECT_FAILED)
     {
       Serial.println("WL_CONNECT_FAILED");
-      return false;
+      state = false;
+      break;
     }
     if (WiFi.status() == WL_NO_SHIELD)
     {
       Serial.println("WL_NO_SHIELD");
-      return false;
-    }
-    if (WiFi.status() != WL_CONNECTED)
-      state = true;
-    else
       state = false;
-
+      break;
+    }
     delay(500);
     timeout++;
-  } while (state || timeout == 50);
+  }
 
   if (state)
   {
+    Serial.println();
     network.AS_IP = WiFi.localIP();
     network.AS_Subnet = WiFi.subnetMask();
     network.AS_Gateway = WiFi.gatewayIP();
     network.AS_Dns = WiFi.dnsIP();
+
+    Serial.println("Ip Address : " + network.AS_IP.toString());
+    Serial.println("Subnet : " + network.AS_Subnet.toString());
+    Serial.println("Gateway : " + network.AS_Gateway.toString());
+    Serial.println("Dns : " + network.AS_Dns.toString());
   }
-  digitalWrite(2, 1);
   return state;
 }
