@@ -20,9 +20,9 @@ struct NetWorkDT
   bool AS_Dhcp;
   String AP_Ssid;
   String AP_Password;
-  IPAddress Ap_IP;
-  IPAddress Ap_Gateway;
-  IPAddress Ap_Subnet;
+  IPAddress AP_IP;
+  IPAddress AP_Gateway;
+  IPAddress AP_Subnet;
   int mode;
 };
 
@@ -30,6 +30,11 @@ IPAddress IP(192, 168, 1, 200);     //ESP static ip
 IPAddress gateway(192, 168, 1, 1);  //IP Address of your WiFi Router (Gateway)
 IPAddress subnet(255, 255, 255, 0); //Subnet mask
 IPAddress dns(8, 8, 8, 8);
+
+IPAddress IPa(192, 168, 2, 200);     //ESP static ip
+IPAddress gatewaya(192, 168, 2, 1);  //IP Address of your WiFi Router (Gateway)
+IPAddress subneta(255, 255, 255, 0); //Subnet mask
+
 NetWorkDT network;
 
 void setup()
@@ -49,7 +54,13 @@ void setup()
   network.AS_Ssid = "D-Link";
   network.AS_Password = "SL2580617418@sh";
 
-  Run_station();
+  network.AP_IP = IPa;
+  network.AP_Gateway = gatewaya;
+  network.AP_Subnet = subneta;
+
+  network.AP_Ssid = "Link";
+
+  Run_Multi();
 }
 
 void loop()
@@ -60,11 +71,11 @@ bool Run_station()
 {
   digitalWrite(2, 0);
   Serial.println("run the wifi to mode Station");
-    ESP.eraseConfig();
-      WiFi.setAutoConnect(false);
-      WiFi.disconnect(true);
-      WiFi.hostname("IOT");
-      WiFi.mode(WIFI_STA);
+  ESP.eraseConfig();
+  WiFi.setAutoConnect(false);
+  WiFi.disconnect(true);
+  WiFi.hostname("IOT");
+  WiFi.mode(WIFI_STA);
   if (network.AS_Password == NULL)
     WiFi.begin(network.AS_Ssid.c_str());
   else
@@ -114,4 +125,26 @@ bool Run_station()
     Serial.println("Dns : " + network.AS_Dns.toString());
   }
   return state;
+}
+void Run_AccessPoint()
+{
+  digitalWrite(2, 0);
+  Serial.println("run the wifi to mode AccessPoint");
+  WiFi.mode(WIFI_AP);
+  WiFi.softAPConfig(network.AP_IP, network.AP_Gateway, network.AP_Subnet);
+  if (network.AP_Password != NULL)
+    WiFi.softAP(network.AP_Ssid.c_str(), network.AP_Password.c_str());
+  else
+    WiFi.softAP(network.AP_Ssid.c_str());
+
+  Serial.println("Access Point is Run");
+  Serial.println("SSid : " + network.AP_Ssid);
+  Serial.print("IP address : ");
+  Serial.println(network.AP_IP);
+  digitalWrite(2, 1);
+}
+void Run_Multi()
+{
+  Run_AccessPoint();
+  Run_station();
 }
