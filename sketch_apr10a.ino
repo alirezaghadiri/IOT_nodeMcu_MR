@@ -24,6 +24,12 @@ struct NtpDT
   bool state;
   String timeZone;
 };
+struct FtpDT
+{
+  String Username;
+  String Password;
+  bool state;
+};
 
 struct NetWorkDT
 {
@@ -78,15 +84,18 @@ enum File_Path_name
 };
 
 NtpDT ntp;
+FtpDT ftp;
 TimeDT NowTime;
 NetWorkDT network;
 AccountDT Account;
 ReleInfoDT RelesInfo[4];
 AlarmInfoDT AlarmsInfo[8];
 
+FtpServer ftpSrv;
 ESP8266WebServer server(80);
 RtcDS3231<TwoWire> Rtc(Wire);
 SNTPtime NTPch("ntp.day.ir");
+ESP8266HTTPUpdateServer httpUpdater;
 
 int ReturnRelePin(int ID)
 {
@@ -164,6 +173,35 @@ void sead()
   else
   {
     Serial.println("file " + Return_file_confing_path(ntp_file_path) + "is exist.");
+  }
+
+  if (!SPIFFS.exists(Return_file_confing_path(ftp_file_path)))
+  {
+    Serial.println("file " + Return_file_confing_path(ftp_file_path) + "is not exist.");
+    ftp.Username = "admin";
+    ftp.Password = "admin123";
+    ftp.state = false;
+    write_ftp_config();
+  }
+  else
+  {
+    Serial.println("file " + Return_file_confing_path(ftp_file_path) + "is exist.");
+  }
+  if (!SPIFFS.exists(Return_file_confing_path(alarm_file_path)))
+  {
+    Serial.println("file " + Return_file_confing_path(alarm_file_path) + "is not exist.");
+    for (int i = 0; i < 8; i++)
+    {
+      AlarmsInfo[i].hour = 0;
+      AlarmsInfo[i].minute = 0;
+      AlarmsInfo[i].period = 0;
+      AlarmsInfo[i].TimerIsActive = false;
+    }
+    write_alarm_config();
+  }
+  else
+  {
+    Serial.println("file " + Return_file_confing_path(alarm_file_path) + "is exist.");
   }
 }
 
@@ -398,6 +436,73 @@ void write_ntp_config()
 
   Json_Write_File(Return_file_confing_path(ntp_file_path), json);
 }
+void read_ftp_config()
+{
+  String Data = Json_Read_File(Return_file_confing_path(ftp_file_path));
+  if (Data != "")
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.parseObject(Data);
+    if (json.success())
+    {
+      ftp.Username = json["Username"].as<String>();
+      ftp.Password = json["Password"].as<String>();
+      ftp.state = String_to_bool(json["state"].as<String>());
+    }
+  }
+}
+
+void write_ftp_config()
+{
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+
+  json["Username"] = ftp.Username;
+  json["Password"] = ftp.Password;
+  json["state"] = bool_to_String(ftp.state);
+
+  Json_Write_File(Return_file_confing_path(ftp_file_path), json);
+}
+
+void read_alarm_config()
+{
+  String Data = Json_Read_File(Return_file_confing_path(alarm_file_path));
+  if (Data != "")
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.parseObject(Data);
+    if (json.success())
+    {
+      for (int i = 0; i < 8; i++)
+      {
+        String objkey = "alarm " + String(i + 1);
+        AlarmsInfo[i].hour = json[objkey]["hour"].as<String>().toInt();
+        AlarmsInfo[i].minute = json[objkey]["minute"].as<String>().toInt();
+        AlarmsInfo[i].period = json[objkey]["period"].as<String>().toInt();
+        AlarmsInfo[i].TimerIsActive = String_to_bool(json[objkey]["TimerIsActive"].as<String>());
+        Serial.println("get timer " + String(i + 1) + " is set : " + String(AlarmsInfo[i].hour) + " : " + String(AlarmsInfo[i].minute) + " for " + String(AlarmsInfo[i].period) + "minute");
+      }
+    }
+  }
+}
+
+void write_alarm_config()
+{
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+
+  for (int i = 0; i < 8; i++)
+  {
+    String objkey = "alarm " + String(i + 1);
+    JsonObject &_json = json.createNestedObject("objkey");
+    json["hour"] = String(AlarmsInfo[i].hour);
+    json["minute"] = String(AlarmsInfo[i].minute);
+    json["period"] = String(AlarmsInfo[i].period);
+    json["TimerIsActive"] = bool_to_String(AlarmsInfo[i].TimerIsActive);
+    Serial.println("set timer " + String(i + 1) + " is set : " + String(AlarmsInfo[i].hour) + " : " + String(AlarmsInfo[i].minute) + " for " + String(AlarmsInfo[i].period) + "minute");
+  }
+  Json_Write_File(Return_file_confing_path(alarm_file_path), json);
+}
 
 void wifi_config()
 {
@@ -630,6 +735,101 @@ void UpdateTime()
   NowTime = GetTime();
 }
 
+int ReturnReleInfoID(int ID)
+{
+  switch (ID)
+  {
+  case 0:
+    return 0;
+  case 1:
+    return 0;
+  case 2:
+    return 1;
+  case 3:
+    return 1;
+  case 4:
+    return 2;
+  case 5:
+    return 2;
+  case 6:
+    return 3;
+  case 7:
+    return 3;
+  }
+}
+
+int TimeConvertToInt(int hour, int minutes)
+{
+  return (hour * 60) + minutes;
+}
+
+int *PeriodConvertToTime(int period, int hour, int minutes)
+{
+  int h = period / 60;
+  int m = period % 60;
+  int tempM = minutes + m;
+  int tempH = hour + h;
+  if (tempM > 59)
+  {
+    tempH += tempM / 60;
+    tempM = tempM % 60;
+  }
+  if (tempH > 23)
+    tempH = tempH - 24;
+  int Mytime[] = {tempH, tempM};
+  return Mytime;
+}
+bool IsEqualTimeToNow(int hour, int minute)
+{
+  TimeDT timeNow = GetTime();
+  if (hour == timeNow.Hour && minute == timeNow.Minute)
+    return true;
+  else
+    return false;
+}
+bool IsStartAlarm(AlarmInfoDT alarm)
+{
+  return IsEqualTimeToNow(alarm.hour, alarm.minute);
+}
+bool IsEndAlarm(AlarmInfoDT alarm)
+{
+  int *temptime = PeriodConvertToTime(alarm.period, alarm.hour, alarm.minute);
+  return IsEqualTimeToNow(temptime[0], temptime[1]);
+}
+
+void PriodAlarm()
+{
+  for (int i = 0; i < 8; i++)
+  {
+    AlarmInfoDT _AlarmInfo = AlarmsInfo[i];
+    if (_AlarmInfo.TimerIsActive)
+    {
+      ReleInfoDT _ReleInfo = RelesInfo[ReturnReleInfoID(i)];
+      if (_ReleInfo.Active && IsEndAlarm(_AlarmInfo))
+      {
+        Serial.println("timer " + String(i + 1) + " is stop now");
+        digitalWrite(_ReleInfo.Rele, 1);
+        _ReleInfo.Active = false;
+      }
+    }
+  }
+}
+
+void Alerm()
+{
+  for (int i = 0; i < 8; i++)
+  {
+    AlarmInfoDT _AlarmInfo = AlarmsInfo[i];
+    if (_AlarmInfo.TimerIsActive)
+      if (IsStartAlarm(_AlarmInfo))
+      {
+        Serial.println("timer " + String(i + 1) + " is start now");
+        digitalWrite(RelesInfo[ReturnReleInfoID(i)].Rele, 0);
+        RelesInfo[ReturnReleInfoID(i)].Active = true;
+      }
+  }
+}
+
 String return_Css()
 {
   String Css = "body { background: #ebc9a2; font-family: 'Tahoma'; direction: rtl; }";
@@ -708,7 +908,8 @@ String return_javaScript()
   js += "function rele2Function() { ReleChangeStatus('rele2');}";
   js += "function rele3Function() { ReleChangeStatus('rele3');}";
   js += "function rele4Function() { ReleChangeStatus('rele4');}";
-  js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == "") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}";
+  js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == "
+        ") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}";
 
   return js;
 }
@@ -951,7 +1152,7 @@ void handleChangePass()
   content += "<<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور '>";
   content += "<input type='submit' value='تغییر' class='login-submit'></form>";
   content += "</body>";
-  content+=BotomHtml();
+  content += BotomHtml();
   server.send(200, "text/html", content);
 }
 
