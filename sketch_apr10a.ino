@@ -25,6 +25,25 @@ struct NetWorkDT
   IPAddress AP_Subnet;
   int mode;
 };
+struct AccountDT
+{
+  String Username;
+  String Password;
+};
+
+struct ReleInfoDT
+{
+  int Rele;
+  bool Active;
+};
+
+struct AlarmInfoDT
+{
+  bool TimerIsActive;
+  int period;
+  int hour;
+  int minute;
+};
 
 enum WifiMode : int
 {
@@ -43,6 +62,37 @@ enum File_Path_name
 };
 
 NetWorkDT network;
+AccountDT Account;
+ReleInfoDT RelesInfo[4];
+AlarmInfoDT AlarmsInfo[8];
+
+ESP8266WebServer server(80);
+
+int ReturnRelePin(int ID)
+{
+  switch (ID)
+  {
+  case 0:
+    return 12;
+  case 1:
+    return 13;
+  case 2:
+    return 14;
+  case 3:
+    return 0;
+  }
+}
+void SetDefultReleInfo()
+{
+  for (int i = 0; i < 4; i++)
+  {
+    int pin = ReturnRelePin(i);
+    RelesInfo[i].Rele = pin;
+    RelesInfo[i].Active = false;
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, 1);
+  }
+}
 
 void sead()
 {
@@ -71,16 +121,28 @@ void sead()
   {
     Serial.println("file " + Return_file_confing_path(wifi_file_path) + "is exist.");
   }
+
+  if (!SPIFFS.exists(Return_file_confing_path(account_file_path)))
+  {
+    Account.Username = "admin";
+    Account.Password = "@dmin";
+    write_account_config();
+  }
+  else
+  {
+    Serial.println("file " + Return_file_confing_path(account_file_path) + "is exist.");
+  }
 }
 
 void setup()
 {
-
   Serial.begin(115200);
   delay(1000);
   Serial.println("Wellcome");
   Serial.println("Booting Sketch...");
   Serial.println("VERSION 2");
+
+  SetDefultReleInfo();
 
   if (SPIFFS.begin())
   {
@@ -97,13 +159,15 @@ void setup()
 
   read_All_config();
 
-  wifi_config();
-
   List_of_file();
+  //wifi_config();
+  Run_station();
+  WebServerConfig();
 }
 
 void loop()
 {
+  server.handleClient();
 }
 
 void List_of_file()
@@ -127,6 +191,7 @@ void List_of_file()
 void read_All_config()
 {
   read_wifi_config();
+  read_account_config();
 }
 String Return_file_confing_path(File_Path_name key)
 {
@@ -144,7 +209,6 @@ String Return_file_confing_path(File_Path_name key)
     return "/account_json_config.txt";
   }
 }
-
 void Json_Write_File(String Path, JsonObject &Data)
 {
   File file;
@@ -182,6 +246,33 @@ String Json_Read_File(String Path)
     return "";
   }
 }
+void read_account_config()
+{
+  String Data = Json_Read_File(Return_file_confing_path(account_file_path));
+  if (Data != "")
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.parseObject(Data);
+    if (json.success())
+    {
+      Account.Username = json["Username"].as<String>();
+      Account.Password = json["Password"].as<String>();
+    }
+    json.end();
+  }
+}
+
+void write_account_config()
+{
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+
+  json["Username"] = Account.Username;
+  json["Password"] = Account.Password;
+
+  Json_Write_File(Return_file_confing_path(account_file_path), json);
+  json.end();
+}
 
 void read_wifi_config()
 {
@@ -208,6 +299,7 @@ void read_wifi_config()
 
       network.mode = json["mode"].as<String>().toInt();
     }
+    json.end();
   }
 }
 
@@ -235,6 +327,7 @@ void write_wifi_config()
   AccessPoint_json["Password"] = network.AP_Password;
 
   Json_Write_File(Return_file_confing_path(wifi_file_path), json);
+  json.end();
 }
 
 void wifi_config()
@@ -257,7 +350,7 @@ bool Run_station()
   digitalWrite(2, 0);
   Serial.println("run the wifi to mode Station");
   ESP.eraseConfig();
-  WiFi.setAutoConnect(false);
+  WiFi.setAutoConnect(true);
   WiFi.disconnect(true);
   WiFi.hostname("IOT");
   WiFi.mode(WIFI_STA);
@@ -380,8 +473,7 @@ String return_Css()
   Css += ".switch { position: relative; display: inline-block; width: 60px; height: 34px; text-align: center;}";
   Css += ".switch input { opacity: 0; width: 0; height: 0; }";
   Css += ".slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #E04141; -webkit-transition: .4s; transition: .4s;}";
-  Css += ".slider:before { position: absolute;content: "
-         ";height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; -webkit-transition: .4s; transition: .4s; }";
+  Css += ".slider:before { position: absolute;content: '';height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; -webkit-transition: .4s; transition: .4s; }";
   Css += "input:checked+.slider { background-color: #34C258;}";
   Css += "input:focus+.slider { box-shadow: 0 0 1px #2196F3;}";
   Css += "input:checked+.slider:before { -webkit-transform: translateX(26px); -ms-transform: translateX(26px); transform: translateX(26px);}";
@@ -402,14 +494,13 @@ String Tophtml(String title = "")
     top += title;
   top += "</title><meta charset='utf-8'>";
   top += "<style type='text/css'>";
-  top+=return_Css();
-  top+="</style>";
+  top += return_Css();
+  top += "</style>";
   top += "</head>";
   return top;
 }
 String NavBar()
 {
-
   String nav = "<div class='topnav'>";
   nav += "<a href='/'>خانه</a>";
   nav += "<a href='/settime'>ساعت</a>";
@@ -423,9 +514,206 @@ String NavBar()
   return nav;
 }
 
-String BotomHtml(){
+String return_javaScript()
+{
+  String js = "var reqwifi = new XMLHttpRequest();";
+  js += "var reqnet = new XMLHttpRequest();";
+  js += "var reqauth = new XMLHttpRequest();";
+  js += "var reqscan = new XMLHttpRequest();";
+  js += "var reqReleStatus = new XMLHttpRequest();";
+  js += "var reqChangeReleStatus = new XMLHttpRequest();";
+
+  js += "function responseStatus() {if (this.readyState == 4 && this.status == 200) {var myobj = JSON.parse(this.responseText); if (myobj.rele1 == 'on') document.getElementById('rele1').checked = true; else document.getElementById('rele1').checked = false; if (myobj.rele2 == 'on') document.getElementById('rele2').checked = true; else document.getElementById('rele2').checked = false; if (myobj.rele3 == 'on') document.getElementById('rele3').checked = true; else document.getElementById('rele3').checked = false; if (myobj.rele4 == 'on') document.getElementById('rele4').checked = true; else document.getElementById('rele4').checked = false; } }";
+
+  js += "function ProcessStatus() { reqReleStatus.open('Get', '/releStatus', true); reqReleStatus.onreadystatechange = responseStatus; reqReleStatus.send(); setTimeout(ProcessStatus, 1000); }";
+
+  js += "function responseChangeStatus(parm) { if (this.readyState == 4 && this.status == 200) { alert('عملیات با موفقیت انجام شد.');} }";
+
+  js += "function ReleChangeStatus(parm) { reqReleStatus.open('Get', '/releChangeStatus?rele=' + parm, true); reqReleStatus.onreadystatechange = responseChangeStatus; reqReleStatus.send();}";
+
+  js += "function rele1Function() { ReleChangeStatus('rele1');}";
+  js += "function rele2Function() { ReleChangeStatus('rele2');}";
+  js += "function rele3Function() { ReleChangeStatus('rele3');}";
+  js += "function rele4Function() { ReleChangeStatus('rele4');}";
+  js += "";
+
+  return js;
+}
+String BotomHtml()
+{
   String contaxt;
-  contaxt+="<script src='scripts.js'></script>";
-  contaxt+="</html>";
+  contaxt += "<script>" + return_javaScript() + "</script>";
+  contaxt += "</html>";
   return contaxt;
+}
+
+void Send_rele_status()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+  for (int i = 0; i < 4; i++)
+  {
+    String key = "rele" + String(i + 1);
+    if (digitalRead(RelesInfo[i].Rele) == 1)
+      json[key] = "off";
+    else
+      json[key] = "on";
+  }
+  String releObj = "";
+  json.printTo(releObj);
+  server.send(200, "text/plain", releObj);
+}
+void ReleChangeState(int id)
+{
+
+  if (digitalRead(RelesInfo[id].Rele) == 1)
+  {
+    digitalWrite(RelesInfo[id].Rele, 0);
+    RelesInfo[id].Active = true;
+    Serial.println("Pin" + String(RelesInfo[id].Rele) + " -> 0");
+  }
+  else
+  {
+    digitalWrite(RelesInfo[id].Rele, 1);
+    RelesInfo[id].Active = false;
+    Serial.println("Pin" + String(RelesInfo[id].Rele) + " -> 1");
+  }
+}
+void handle_ReleChangeState()
+{
+  Serial.println("enter rchs");
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  if (server.hasArg("rele"))
+  {
+    Serial.println(server.arg("rele"));
+    if (server.arg("rele") == "rele1")
+      ReleChangeState(0);
+    if (server.arg("rele") == "rele2")
+      ReleChangeState(1);
+    if (server.arg("rele") == "rele3")
+      ReleChangeState(2);
+    if (server.arg("rele") == "rele4")
+      ReleChangeState(3);
+  }
+  Serial.println(server.arg("end"));
+  server.send(200, "text/plain", "Rele status is change");
+}
+
+bool is_authentified()
+{
+  Serial.println("Enter is_authentified");
+  if (server.hasHeader("Cookie"))
+  {
+    Serial.print("Found cookie: ");
+    String cookie = server.header("Cookie");
+    Serial.println(cookie);
+    if (cookie.indexOf("ESPSESSIONID=1") != -1)
+    {
+      Serial.println("Authentification Successful");
+      return true;
+    }
+  }
+  Serial.println("Authentification Failed");
+  return false;
+}
+
+void handleLogin()
+{
+  String msg;
+  if (server.hasHeader("Cookie"))
+  {
+    Serial.print("Found cookie: ");
+    String cookie = server.header("Cookie");
+    Serial.println(cookie);
+  }
+
+  if (server.hasArg("DISCONNECT"))
+  {
+    Serial.println("Disconnection");
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.sendHeader("Set-Cookie", "ESPSESSIONID=0");
+    server.send(301);
+    return;
+  }
+  if (server.hasArg("USERNAME") && server.hasArg("PASSWORD"))
+  {
+    if (server.arg("USERNAME") == Account.Username && server.arg("PASSWORD") == Account.Password)
+    {
+      server.sendHeader("Location", "/");
+      server.sendHeader("Cache-Control", "no-cache");
+      server.sendHeader("Set-Cookie", "ESPSESSIONID=1");
+      server.send(301);
+      Serial.println("Log in Successful");
+      return;
+    }
+    msg = "Wrong username/password! try again.";
+    Serial.println("Log in Failed");
+  }
+  String content = Tophtml("Login");
+  content += "<body>";
+  content += "<form method='POST' class='login' action='/login'><h1>ورود</h1><input type='user' name='USERNAME' class='login-input' placeholder='نام کاربری'>";
+  content += "<input type='pass' name='PASSWORD' class='login-input' placeholder='کلمه عبور'><input type='submit' name='SUBMIT' value='ورود' class='login-submit'></form>";
+  content += "</body></html>";
+  server.send(200, "text/html", content);
+}
+void handleRoot()
+{
+  Serial.println("Enter handleRoot");
+  String header;
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  String contaxt = Tophtml();
+  contaxt += "<body onload='ProcessStatus()'>";
+  contaxt += NavBar();
+  contaxt += "<div class='login'>";
+  for (int i = 0; i < 4; i++)
+  {
+    contaxt += "<div class='onoffsw'><label class='labelsswitch'>";
+    contaxt += " رله" + String(i + 1);
+    contaxt += "</label><label class='switch'>";
+    contaxt += "<input type='checkbox'  id='";
+    contaxt += "rele" + String(i + 1) + "' ";
+    contaxt += "onchange='rele" + String(i + 1) + "Function()'/>";
+    contaxt += "<span class='slider round'></span></label></div>";
+    if (i < 3)
+      contaxt += "<br/>";
+  }
+  contaxt += "</div></body>";
+  contaxt += BotomHtml();
+  server.send(200, "text/html", contaxt);
+}
+
+void WebServerConfig()
+{
+  Serial.println("Init HTTP server");
+  server.on("/", handleRoot);
+  server.on("/releStatus", Send_rele_status);
+  server.on("/releChangeStatus", handle_ReleChangeState);
+  server.on("/login", handleLogin);
+
+  server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
+  const char *headerkeys[] = {"User-Agent", "Cookie"};
+  size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
+  server.collectHeaders(headerkeys, headerkeyssize);
+  server.begin();
+  Serial.println("HTTP server started");
 }
