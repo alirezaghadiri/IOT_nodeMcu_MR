@@ -9,6 +9,22 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
 
+struct TimeDT
+{
+  int Hour;
+  int Minute;
+  int Second;
+  int Day;
+  int Month;
+  int Year;
+};
+struct NtpDT
+{
+  String server;
+  bool state;
+  String timeZone;
+};
+
 struct NetWorkDT
 {
   IPAddress AS_IP;
@@ -61,12 +77,16 @@ enum File_Path_name
   account_file_path,
 };
 
+NtpDT ntp;
+TimeDT NowTime;
 NetWorkDT network;
 AccountDT Account;
 ReleInfoDT RelesInfo[4];
 AlarmInfoDT AlarmsInfo[8];
 
 ESP8266WebServer server(80);
+RtcDS3231<TwoWire> Rtc(Wire);
+SNTPtime NTPch("ntp.day.ir");
 
 int ReturnRelePin(int ID)
 {
@@ -124,6 +144,7 @@ void sead()
 
   if (!SPIFFS.exists(Return_file_confing_path(account_file_path)))
   {
+    Serial.println("file " + Return_file_confing_path(account_file_path) + "is not exist.");
     Account.Username = "admin";
     Account.Password = "@dmin";
     write_account_config();
@@ -131,6 +152,18 @@ void sead()
   else
   {
     Serial.println("file " + Return_file_confing_path(account_file_path) + "is exist.");
+  }
+  if (!SPIFFS.exists(Return_file_confing_path(ntp_file_path)))
+  {
+    Serial.println("file " + Return_file_confing_path(ntp_file_path) + "is not exist.");
+    ntp.server = "ntp.day.ir";
+    ntp.state = false;
+    ntp.timeZone = "3.5";
+    write_ntp_config();
+  }
+  else
+  {
+    Serial.println("file " + Return_file_confing_path(ntp_file_path) + "is exist.");
   }
 }
 
@@ -159,6 +192,13 @@ void setup()
 
   read_All_config();
 
+  RTCConfig();
+
+  NTPConfig();
+
+  TimeDT now = GetTime();
+  Serial.println(String(now.Year) + "/" + String(now.Month) + "/" + String(now.Day) + " - " +
+                 String(now.Hour) + ":" + String(now.Minute) + ":" + String(now.Second));
   List_of_file();
   //wifi_config();
   Run_station();
@@ -192,6 +232,7 @@ void read_All_config()
 {
   read_wifi_config();
   read_account_config();
+  read_ntp_config();
 }
 String Return_file_confing_path(File_Path_name key)
 {
@@ -330,6 +371,34 @@ void write_wifi_config()
   json.end();
 }
 
+void read_ntp_config()
+{
+  String Data = Json_Read_File(Return_file_confing_path(ntp_file_path));
+  if (Data != "")
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.parseObject(Data);
+    if (json.success())
+    {
+      ntp.server = json["Server"].as<String>();
+      ntp.state = String_to_bool(json["state"].as<String>());
+      ntp.timeZone = json["timeZone"].as<String>();
+    }
+  }
+}
+
+void write_ntp_config()
+{
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+
+  json["Server"] = ntp.server;
+  json["state"] = bool_to_String(ntp.state);
+  json["timeZone"] = ntp.timeZone;
+
+  Json_Write_File(Return_file_confing_path(ntp_file_path), json);
+}
+
 void wifi_config()
 {
   switch (network.mode)
@@ -457,6 +526,110 @@ String bool_to_String(bool b)
     return "false";
 }
 
+bool RTCConfig()
+{
+  Rtc.Begin();
+  if (!Rtc.IsDateTimeValid())
+  {
+    if (Rtc.LastError() != 0)
+    {
+      Serial.print("RTC communications error = ");
+      Serial.println(Rtc.LastError());
+    }
+    else
+    {
+      Serial.println("RTC lost confidence in the DateTime!");
+      Rtc.SetDateTime(RtcDateTime(2019, 1, 1, 0, 0, 0));
+    }
+    return false;
+  }
+  else
+  {
+    Serial.println("rtc run good");
+    return true;
+  }
+}
+
+bool NTPConfig()
+{
+  int timeout = 0;
+  boolean temp;
+  Serial.println("SYNC TIME");
+  do
+  {
+    Serial.print(".");
+    timeout++;
+    temp = !NTPch.setSNTPtime();
+  } while (temp || timeout == 60);
+
+  return temp;
+}
+TimeDT GetTimeFormRTC()
+{
+  RtcDateTime datetime = Rtc.GetDateTime();
+  TimeDT temp;
+  temp.Year = datetime.Year();
+  temp.Month = datetime.Month();
+  temp.Day = datetime.Day();
+  temp.Hour = datetime.Hour();
+  temp.Minute = datetime.Minute();
+  temp.Second = datetime.Second();
+
+  return temp;
+}
+void setTimeFormRTC()
+{
+  Rtc.SetDateTime(RtcDateTime(NowTime.Year, NowTime.Month, NowTime.Day, NowTime.Hour, NowTime.Minute, Rtc.GetDateTime().Second()));
+}
+
+int ConvertMiladitoShamsi(int _Month)
+{
+  int temp = _Month + 10;
+  if (temp >= 13)
+    temp = temp - 12;
+  return temp;
+}
+
+bool IssummerTime(int _Month)
+{
+  if (ConvertMiladitoShamsi(_Month) <= 6)
+    return true;
+  else
+    return false;
+}
+
+TimeDT GetTimeFormNTP()
+{
+  strDateTime datetime;
+  double zone = 0;
+  if (IssummerTime)
+    zone = ntp.timeZone.toDouble() + 1;
+  else
+    zone = ntp.timeZone.toDouble();
+  datetime = NTPch.getTime(zone, 0);
+  TimeDT temp;
+  temp.Year = datetime.year;
+  temp.Month = datetime.month;
+  temp.Day = datetime.day;
+  temp.Hour = datetime.hour;
+  temp.Minute = datetime.minute;
+  temp.Second = datetime.second;
+
+  return temp;
+}
+
+TimeDT GetTime()
+{
+  if (ntp.state)
+    return GetTimeFormNTP();
+  else
+    return GetTimeFormRTC();
+}
+void UpdateTime()
+{
+  NowTime = GetTime();
+}
+
 String return_Css()
 {
   String Css = "body { background: #ebc9a2; font-family: 'Tahoma'; direction: rtl; }";
@@ -503,7 +676,7 @@ String NavBar()
 {
   String nav = "<div class='topnav'>";
   nav += "<a href='/'>خانه</a>";
-  nav += "<a href='/settime'>ساعت</a>";
+  nav += "<a href='/RTCtime'>ساعت</a>";
   nav += "<a href='setalerm'>آلارم</a>";
   nav += "<a href='/adslmodem'>مودم</a>";
   nav += "<a href='/settingip'>شبکه</a>";
@@ -702,6 +875,43 @@ void handleRoot()
   server.send(200, "text/html", contaxt);
 }
 
+void handleRTCtime()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  UpdateTime();
+  if (server.hasArg("Hour") && server.hasArg("MIN") && server.hasArg("YEAR") && server.hasArg("MONTH") && server.hasArg("DAY"))
+  {
+    NowTime.Hour = server.arg("Hour").toInt();
+    NowTime.Minute = server.arg("MIN").toInt();
+    NowTime.Year = server.arg("YEAR").toInt();
+    NowTime.Month = server.arg("MONTH").toInt();
+    NowTime.Day = server.arg("DAY").toInt();
+    setTimeFormRTC();
+  }
+  TimeDT rtctime = GetTimeFormRTC();
+  String content = Tophtml();
+  content += "<body>";
+  content += NavBar();
+  content += "<form method='POST' class='login' action='/settime'><h1>تنظیم ساعت</h1>";
+  content += "<input type='text' name='Hour'  disabled class='login-input' placeholder='ساعت' value=" + String(rtctime.Hour) + ">";
+  content += "<input type='text' name='MIN'  disabled class='login-input' placeholder='دقیقه'value=" + String(rtctime.Minute) + ">";
+  content += "<br>";
+  content += "<form method='POST' class='login' action='/login'><h1>تنظیم تاریخ</h1>";
+  content += "<input type='text' name='YEAR' disabled class='login-input' placeholder='سال' value=" + String(rtctime.Year) + ">";
+  content += "<input type='text' name='MONTH' disabled class='login-input' placeholder='ماه' value=" + String(rtctime.Month) + ">";
+  content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(rtctime.Day) + ">";
+  content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'></form>";
+  content += "</body>";
+  content+=BotomHtml();
+  server.send(200, "text/html", content);
+}
+
 void WebServerConfig()
 {
   Serial.println("Init HTTP server");
@@ -709,6 +919,7 @@ void WebServerConfig()
   server.on("/releStatus", Send_rele_status);
   server.on("/releChangeStatus", handle_ReleChangeState);
   server.on("/login", handleLogin);
+  server.on("/RTCtime", handleRTCtime);
 
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
   const char *headerkeys[] = {"User-Agent", "Cookie"};
