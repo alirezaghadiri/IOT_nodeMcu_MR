@@ -42,15 +42,6 @@ enum File_Path_name
   account_file_path,
 };
 
-IPAddress IP(192, 168, 1, 200);     //ESP static ip
-IPAddress gateway(192, 168, 1, 1);  //IP Address of your WiFi Router (Gateway)
-IPAddress subnet(255, 255, 255, 0); //Subnet mask
-IPAddress dns(8, 8, 8, 8);
-
-IPAddress IPa(192, 168, 2, 200);     //ESP static ip
-IPAddress gatewaya(192, 168, 2, 1);  //IP Address of your WiFi Router (Gateway)
-IPAddress subneta(255, 255, 255, 0); //Subnet mask
-
 NetWorkDT network;
 
 void sead()
@@ -104,21 +95,6 @@ void setup()
   sead();
   Serial.println("cheaked   confing file");
 
-  /*network.AS_IP = IP;
-  network.AS_Gateway = gateway;
-  network.AS_Subnet = subnet;
-  network.AS_Dns = dns;
-  network.AS_Dhcp = false;
-
-  network.AS_Ssid = "D-Link";
-  network.AS_Password = "SL2580617418@sh";
-  network.mode = both;
-
-  network.AP_IP = IPa;
-  network.AP_Gateway = gatewaya;
-  network.AP_Subnet = subneta;
-
-  network.AP_Ssid = "Link";*/
   read_All_config();
 
   wifi_config();
@@ -148,7 +124,8 @@ void List_of_file()
   }
 }
 
-void read_All_config(){
+void read_All_config()
+{
   read_wifi_config();
 }
 String Return_file_confing_path(File_Path_name key)
@@ -385,4 +362,70 @@ String bool_to_String(bool b)
     return "true";
   else
     return "false";
+}
+
+String return_Css()
+{
+  String Css = "body { background: #ebc9a2; font-family: 'Tahoma'; direction: rtl; }";
+  Css += ".login { margin: 50px auto; padding: 18px 20px; width: 200px; background: #3f65b7; background-clip: padding-box; border: 1px solid #172b4e; border-bottom-color: #142647; border-radius: 5px; box-shadow: inset 0 1px rgba(255, 255, 255, 0.3), inset 0 0 1px 1px rgba(255, 255, 255, 0.1), 0 2px 10px rgba(0, 0, 0, 0.5);}";
+  Css += ".login>h1 { margin-bottom: 20px; font-size: 16px; font-weight: bold; color: white; text-align: center; text-shadow: 0 -1px rgba(0, 0, 0, 0.4);}";
+  Css += ".login-input { display: block; width: 100%; height: 37px; margin-bottom: 20px; font-family: 'Arial'; font-size: 26px; text-align: center; padding: 0 9px; color: white; text-shadow: 0 1px black; background: #2b3e5d; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 4px 1px rgba(255, 255, 255, 0.6);}";
+  Css += ".login-submit { display: block; width: 100%; height: 37px; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #294779; text-align: center; text-shadow: 0 1px rgba(255, 255, 255, 0.3);}";
+  Css += ".login-dropdown { display: block; width: 100%; height: 37px; margin-bottom: 20px; font-size: 26px; text-align: center; color: white; text-shadow: 0 1px black; background: #2b3e5d;box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 4px 1px rgba(255, 255, 255, 0.6);}";
+  Css += ".login-label { display: block; margin-bottom: 10px; font-size: 18px; text-align: center;color: white;}";
+  Css += ".topnav { background-color: #3f65b7; background-clip: padding-box; border: 1px solid #172b4e; overflow: hidden; border-bottom-color: #142647; border-radius: 5px; box-shadow: inset 0 1px rgba(255, 255, 255, 0.3), inset 0 0 1px 1px rgba(255, 255, 255, 0.1), 0 2px 10px rgba(0, 0, 0, 0.5); padding: 10px 0px 10px 0px;text-align: center;}";
+  Css += ".topnav a { color: #f2f2f2; text-align: center; padding: 90px 16px; text-decoration: none; font-size: 17px;}";
+  Css += ".topnav a:hover { background-color: #ddd; color: black;}";
+  Css += ".topnav a.active { background-color: #4CAF50; color: white;}";
+  Css += ".switch { position: relative; display: inline-block; width: 60px; height: 34px; text-align: center;}";
+  Css += ".switch input { opacity: 0; width: 0; height: 0; }";
+  Css += ".slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #E04141; -webkit-transition: .4s; transition: .4s;}";
+  Css += ".slider:before { position: absolute;content: "
+         ";height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; -webkit-transition: .4s; transition: .4s; }";
+  Css += "input:checked+.slider { background-color: #34C258;}";
+  Css += "input:focus+.slider { box-shadow: 0 0 1px #2196F3;}";
+  Css += "input:checked+.slider:before { -webkit-transform: translateX(26px); -ms-transform: translateX(26px); transform: translateX(26px);}";
+  Css += ".slider.round { border-radius: 34px; }";
+  Css += ".slider.round:before { border-radius: 50%;}";
+  Css += ".onoffsw { margin: auto; text-align: center; }";
+  Css += ".labelsswitch { padding-left: 10px; padding-right: 10px;}";
+
+  return Css;
+}
+
+String Tophtml(String title = "")
+{
+  String top = "<html><head><title>";
+  if (title == "")
+    top += "IOT Web Service";
+  else
+    top += title;
+  top += "</title><meta charset='utf-8'>";
+  top += "<style type='text/css'>";
+  top+=return_Css();
+  top+="</style>";
+  top += "</head>";
+  return top;
+}
+String NavBar()
+{
+
+  String nav = "<div class='topnav'>";
+  nav += "<a href='/'>خانه</a>";
+  nav += "<a href='/settime'>ساعت</a>";
+  nav += "<a href='setalerm'>آلارم</a>";
+  nav += "<a href='/adslmodem'>مودم</a>";
+  nav += "<a href='/settingip'>شبکه</a>";
+  nav += "<a href='/chkpass'>تغییر پسورد</a>";
+  nav += "<a href='/login?DISCONNECT=YES'>خروج</a>";
+  nav += "</div>";
+
+  return nav;
+}
+
+String BotomHtml(){
+  String contaxt;
+  contaxt+="<script src='scripts.js'></script>";
+  contaxt+="</html>";
+  return contaxt;
 }
