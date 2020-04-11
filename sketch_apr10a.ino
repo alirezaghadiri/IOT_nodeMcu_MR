@@ -237,6 +237,12 @@ void setup()
   TimeDT now = GetTime();
   Serial.println(String(now.Year) + "/" + String(now.Month) + "/" + String(now.Day) + " - " +
                  String(now.Hour) + ":" + String(now.Minute) + ":" + String(now.Second));
+
+   for (int i = 0; i < 8; i++)
+   {
+     IsRunAlarm(i);
+   }
+                 
   List_of_file();
   //wifi_config();
   Run_station();
@@ -246,6 +252,8 @@ void setup()
 void loop()
 {
   server.handleClient();
+  Alerm();
+  PriodAlarm();
 }
 
 void List_of_file()
@@ -271,6 +279,8 @@ void read_All_config()
   read_wifi_config();
   read_account_config();
   read_ntp_config();
+  read_ftp_config();
+  read_alarm_config();
 }
 String Return_file_confing_path(File_Path_name key)
 {
@@ -796,7 +806,58 @@ bool IsEndAlarm(AlarmInfoDT alarm)
   int *temptime = PeriodConvertToTime(alarm.period, alarm.hour, alarm.minute);
   return IsEqualTimeToNow(temptime[0], temptime[1]);
 }
+bool IsRunAlarm(int ID)
+{
+  TimeDT time = GetTime();
 
+  AlarmInfoDT info = AlarmsInfo[ID];
+  int IntStartAlarm = TimeConvertToInt(info.hour, info.minute);
+
+  int *EndTime = PeriodConvertToTime(AlarmsInfo[ID].period, AlarmsInfo[ID].hour, AlarmsInfo[ID].minute);
+  int IntEndTime = TimeConvertToInt(EndTime[0], EndTime[1]);
+
+  int IntNowTime = TimeConvertToInt(time.Hour, time.Minute);
+
+  int h = AlarmsInfo[ID].period / 60;
+  int m = AlarmsInfo[ID].period % 60;
+  int tempM = AlarmsInfo[ID].minute + m;
+  int tempH = AlarmsInfo[ID].hour + h;
+  if (tempM > 59)
+  {
+    tempH += tempM / 60;
+    tempM = tempM % 60;
+  }
+
+  if (IntStartAlarm < IntNowTime)
+  {
+    if (tempH > 23)
+    {
+      return true;
+    }
+    else
+    {
+      if (IntNowTime < IntEndTime)
+      {
+        return true;
+      }
+      else
+      {
+        return false;
+      }
+    }
+  }
+  else
+  {
+    if (IntNowTime < IntEndTime)
+    {
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
 void PriodAlarm()
 {
   for (int i = 0; i < 8; i++)
@@ -814,7 +875,6 @@ void PriodAlarm()
     }
   }
 }
-
 void Alerm()
 {
   for (int i = 0; i < 8; i++)
@@ -880,6 +940,7 @@ String NavBar()
   nav += "<a href='setalerm'>آلارم</a>";
   nav += "<a href='/adslmodem'>مودم</a>";
   nav += "<a href='/settingip'>شبکه</a>";
+  nav += "<a href='/setting'>تنظیمات</a>";
   nav += "<a href='/chkpass'>تغییر پسورد</a>";
   nav += "<a href='/login?DISCONNECT=YES'>خروج</a>";
   nav += "</div>";
@@ -920,7 +981,38 @@ String BotomHtml()
   contaxt += "</html>";
   return contaxt;
 }
+void handle_restart()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(401);
+    return;
+  }
+  ESP.restart();
+}
 
+void handle_on_off_ntp()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(401);
+    return;
+  }
+  ntp.state = !ntp.state;
+  write_ntp_config();
+
+  server.sendHeader("Location", "/setting");
+  server.sendHeader("Cache-Control", "no-cache");
+  server.send(301);
+}
+void handledefultSetting()
+{
+  ESP.reset();
+}
 void Send_rele_status()
 {
   if (!is_authentified())
@@ -1155,6 +1247,184 @@ void handleChangePass()
   content += BotomHtml();
   server.send(200, "text/html", content);
 }
+void handleSetAlrem()
+{
+
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(401);
+    return;
+  }
+
+  if (server.hasArg("Hour1") && server.hasArg("MIN1") && server.hasArg("P1"))
+  {
+    AlarmsInfo[0].hour = server.arg("Hour1").toInt();
+    AlarmsInfo[0].minute = server.arg("MIN1").toInt();
+    AlarmsInfo[0].period = server.arg("P1").toInt();
+    AlarmsInfo[0].TimerIsActive = false;
+    if (server.arg("ISACtive1") == "on")
+      AlarmsInfo[0].TimerIsActive = true;
+    write_alarm_config();
+  }
+
+  if (server.hasArg("Hour2") && server.hasArg("MIN2") && server.hasArg("P2"))
+  {
+    AlarmsInfo[1].hour = server.arg("Hour2").toInt();
+    AlarmsInfo[1].minute = server.arg("MIN2").toInt();
+    AlarmsInfo[1].period = server.arg("P2").toInt();
+    AlarmsInfo[1].TimerIsActive = false;
+    if (server.arg("ISACtive2") == "on")
+      AlarmsInfo[1].TimerIsActive = true;
+    write_alarm_config();
+  }
+
+  if (server.hasArg("Hour3") && server.hasArg("MIN3") && server.hasArg("P3"))
+  {
+    AlarmsInfo[2].hour = server.arg("Hour3").toInt();
+    AlarmsInfo[2].minute = server.arg("MIN3").toInt();
+    AlarmsInfo[2].period = server.arg("P3").toInt();
+    AlarmsInfo[2].TimerIsActive = false;
+    if (server.arg("ISACtive3") == "on")
+      AlarmsInfo[2].TimerIsActive = true;
+    write_alarm_config();
+  }
+
+  if (server.hasArg("Hour4") && server.hasArg("MIN4") && server.hasArg("P4"))
+  {
+    AlarmsInfo[3].hour = server.arg("Hour4").toInt();
+    AlarmsInfo[3].minute = server.arg("MIN4").toInt();
+    AlarmsInfo[3].period = server.arg("P4").toInt();
+    AlarmsInfo[3].TimerIsActive = false;
+    if (server.arg("ISACtive4") == "on")
+      AlarmsInfo[3].TimerIsActive = true;
+    write_alarm_config();
+  }
+  if (server.hasArg("Hour5") && server.hasArg("MIN5") && server.hasArg("P5"))
+  {
+    AlarmsInfo[4].hour = server.arg("Hour5").toInt();
+    AlarmsInfo[4].minute = server.arg("MIN5").toInt();
+    AlarmsInfo[4].period = server.arg("P5").toInt();
+    AlarmsInfo[4].TimerIsActive = false;
+    if (server.arg("ISACtive5") == "on")
+      AlarmsInfo[4].TimerIsActive = true;
+    write_alarm_config();
+  }
+  if (server.hasArg("Hour6") && server.hasArg("MIN6") && server.hasArg("P6"))
+  {
+    AlarmsInfo[5].hour = server.arg("Hour6").toInt();
+    AlarmsInfo[5].minute = server.arg("MIN6").toInt();
+    AlarmsInfo[5].period = server.arg("P6").toInt();
+    AlarmsInfo[5].TimerIsActive = false;
+    if (server.arg("ISACtive6") == "on")
+      AlarmsInfo[5].TimerIsActive = true;
+    write_alarm_config();
+  }
+
+  if (server.hasArg("Hour7") && server.hasArg("MIN7") && server.hasArg("P7"))
+  {
+    AlarmsInfo[6].hour = server.arg("Hour7").toInt();
+    AlarmsInfo[6].minute = server.arg("MIN7").toInt();
+    AlarmsInfo[6].period = server.arg("P7").toInt();
+    AlarmsInfo[6].TimerIsActive = false;
+    if (server.arg("ISACtive7") == "on")
+      AlarmsInfo[6].TimerIsActive = true;
+    write_alarm_config();
+  }
+
+  if (server.hasArg("Hour8") && server.hasArg("MIN8") && server.hasArg("P8"))
+  {
+    AlarmsInfo[7].hour = server.arg("Hour8").toInt();
+    AlarmsInfo[7].minute = server.arg("MIN8").toInt();
+    AlarmsInfo[7].period = server.arg("P8").toInt();
+    AlarmsInfo[7].TimerIsActive = false;
+    if (server.arg("ISACtive8") == "on")
+      AlarmsInfo[7].TimerIsActive = true;
+    write_alarm_config();
+  }
+  String content = Tophtml("تنظیم آلارم");
+
+  content += "<body>";
+  content += NavBar();
+
+  for (int i = 0; i < 8; i++)
+  {
+    content += "<form method='POST' class='login' action='/setalerm'><h1>Alerm" + String(i + 1) + " for rele" + String(ReturnReleInfoID(i) + 1) + "</h1>";
+    content += "<input type='text' name='Hour" + String(i + 1) + "' class='login-input' placeholder='ساعت' value=" + String(AlarmsInfo[i].hour) + ">";
+    content += " <input type='text' name='MIN" + String(i + 1) + "' class='login-input' placeholder='دقیقه'value=" + String(AlarmsInfo[i].minute) + ">";
+    content += " <input type='text' name='P" + String(i + 1) + "' class='login-input' placeholder='مدت' value=" + String(AlarmsInfo[i].period) + ">";
+    if (AlarmsInfo[i].TimerIsActive)
+      content += "<input type='checkbox' name='ISACtive" + String(i + 1) + "' checked>روشن";
+    else
+      content += "<input type='checkbox' name='ISACtive" + String(i + 1) + "'>روشن";
+
+    content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'></form>";
+
+    content += "<br>";
+  }
+
+  content += "</body>";
+  content += BotomHtml();
+  server.send(200, "text/html", content);
+}
+void handlesetting_ftp()
+{
+  if (server.hasArg("chkftp") && server.hasArg("USERNAME") && server.hasArg("PASSWORD"))
+  {
+    ftp.state = !ftp.state;
+    ftp.Username = server.arg("USERNAME");
+    ftp.Password = server.arg("PASSWORD");
+    write_ftp_config();
+  }
+
+  server.sendHeader("Location", "/setting");
+  server.sendHeader("Cache-Control", "no-cache");
+  server.send(301);
+}
+void handleSetting()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(401);
+    return;
+  }
+  String content = Tophtml("تنظیمات");
+  content += "<body>";
+  content += NavBar();
+  content += "<form class='login' method='POST' action='/on_off_ntp'><div class='onoffsw'><label class='labelsswitch'>سرور ntp : </label><label class='switch'>";
+  if (ntp.state)
+    content += "<input type='checkbox' cheaked id='ntp'/>";
+  else
+    content += "<input type='checkbox'  id='ntp'/>";
+  content += "<span class='slider round'></span></label></div></form>";
+
+  content += "<form method='POST' action='/setting_ftp' class='login'><h1>تنظیمات ftp </h1><div class='onoffsw'><label class='labelsswitch'>سرور ftp : </label><label class='switch'>";
+  if (ftp.state)
+    content += "<input type='checkbox' cheaked name='chkftp' id='chkftp'/>";
+  else
+    content += "<input type='checkbox'  name='chkftp' id='chkftp'/>";
+
+  content += "<span class='slider round'></span></label></div><br/>";
+  content += "<input type='user' name='USERNAME' id='USERNAME'class='login-input' placeholder='نام کاربری'> <input type='pass' name='PASSWORD' id='PASSWORD'class='login-input' placeholder='کلمه عبور'><input type='submit' name='SUBMIT' value='ذخیر' class='login-submit'></form>";
+
+  content += "<div class='login'>";
+  content += "<form action='/restart' method='POST'>";
+  content += "<input type='submit'  value='راه اندازی مجدد' class='login-submit'></form>";
+  content += "<form action='/defult' method='POST'>";
+  content += "<input type='submit'  value='تنظیمات کارخانه' class='login-submit'></form>";
+  content += "</div>";
+
+  
+  content += "</body>";
+  content += BotomHtml();
+  server.send(200, "text/html", content);
+}
+
+
+
 
 void WebServerConfig()
 {
@@ -1164,8 +1434,14 @@ void WebServerConfig()
   server.on("/releChangeStatus", handle_ReleChangeState);
   server.on("/login", handleLogin);
   server.on("/RTCtime", handleRTCtime);
-
   server.on("/chkpass", handleChangePass);
+  server.on("/setting", handleSetting);
+  server.on("/restart", handle_restart);
+  server.on("/on_off_ntp", handle_on_off_ntp);
+  server.on("/chkpass", handleChangePass);
+  server.on("/setting_ftp", handlesetting_ftp);
+  server.on("/defult", handledefultSetting);
+  
 
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
   const char *headerkeys[] = {"User-Agent", "Cookie"};
