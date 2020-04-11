@@ -238,11 +238,11 @@ void setup()
   Serial.println(String(now.Year) + "/" + String(now.Month) + "/" + String(now.Day) + " - " +
                  String(now.Hour) + ":" + String(now.Minute) + ":" + String(now.Second));
 
-   for (int i = 0; i < 8; i++)
-   {
-     IsRunAlarm(i);
-   }
-                 
+  for (int i = 0; i < 8; i++)
+  {
+    IsRunAlarm(i);
+  }
+
   List_of_file();
   //wifi_config();
   Run_station();
@@ -969,8 +969,9 @@ String return_javaScript()
   js += "function rele2Function() { ReleChangeStatus('rele2');}";
   js += "function rele3Function() { ReleChangeStatus('rele3');}";
   js += "function rele4Function() { ReleChangeStatus('rele4');}";
-  js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == "
-        ") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}";
+
+  js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == ''";
+  js += ") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}}";
 
   return js;
 }
@@ -1417,14 +1418,10 @@ void handleSetting()
   content += "<input type='submit'  value='تنظیمات کارخانه' class='login-submit'></form>";
   content += "</div>";
 
-  
   content += "</body>";
   content += BotomHtml();
   server.send(200, "text/html", content);
 }
-
-
-
 
 void WebServerConfig()
 {
@@ -1441,7 +1438,6 @@ void WebServerConfig()
   server.on("/chkpass", handleChangePass);
   server.on("/setting_ftp", handlesetting_ftp);
   server.on("/defult", handledefultSetting);
-  
 
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
   const char *headerkeys[] = {"User-Agent", "Cookie"};
