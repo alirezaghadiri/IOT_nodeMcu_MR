@@ -708,7 +708,7 @@ String return_javaScript()
   js += "function rele2Function() { ReleChangeStatus('rele2');}";
   js += "function rele3Function() { ReleChangeStatus('rele3');}";
   js += "function rele4Function() { ReleChangeStatus('rele4');}";
-  js += "";
+  js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == "") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}";
 
   return js;
 }
@@ -908,6 +908,49 @@ void handleRTCtime()
   content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(rtctime.Day) + ">";
   content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'></form>";
   content += "</body>";
+  content += BotomHtml();
+  server.send(200, "text/html", content);
+}
+
+void handleChangePass()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  if (server.hasArg("OLDPASSWORD") && server.hasArg("NEWPASSWORD") && server.hasArg("RNPASSWORD"))
+  {
+    String Old = server.arg("OLDPASSWORD");
+    String NEW = server.arg("NEWPASSWORD");
+    String RNEW = server.arg("RNPASSWORD");
+    Serial.print("Old : ");
+    Serial.println(Old);
+    Serial.print("NEW : ");
+    Serial.println(NEW);
+    Serial.print("RNEW : ");
+    Serial.println(RNEW);
+
+    if (Old == Account.Password)
+      if (NEW == RNEW)
+      {
+        Account.Password = NEW;
+        write_account_config();
+      }
+  }
+  String content = Tophtml("تغییر پسورد");
+
+  content += "<body>";
+  content += NavBar();
+  content += "<form name='chkForm' action='#' onsubmit='return chkpassFunction()' method='post' class='login'>";
+  content += "<h1>تغییر پسورد</h1>";
+  content += "<input type='text' name='OLDPASSWORD' id='OLDPASSWORD' class='login-input' placeholder='کلمه عبور قبلی '>";
+  content += "<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور'>";
+  content += "<<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور '>";
+  content += "<input type='submit' value='تغییر' class='login-submit'></form>";
+  content += "</body>";
   content+=BotomHtml();
   server.send(200, "text/html", content);
 }
@@ -920,6 +963,8 @@ void WebServerConfig()
   server.on("/releChangeStatus", handle_ReleChangeState);
   server.on("/login", handleLogin);
   server.on("/RTCtime", handleRTCtime);
+
+  server.on("/chkpass", handleChangePass);
 
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
   const char *headerkeys[] = {"User-Agent", "Cookie"};
