@@ -81,6 +81,7 @@ enum File_Path_name
   ftp_file_path,
   alarm_file_path,
   account_file_path,
+  rele_file_path,
 };
 
 NtpDT ntp;
@@ -116,10 +117,10 @@ void SetDefultReleInfo()
   for (int i = 0; i < 4; i++)
   {
     int pin = ReturnRelePin(i);
-    RelesInfo[i].Rele = pin;
-    RelesInfo[i].Active = false;
     pinMode(pin, OUTPUT);
     digitalWrite(pin, 1);
+    RelesInfo[i].Rele = pin;
+    RelesInfo[i].Active = false;
   }
 }
 
@@ -128,7 +129,7 @@ void sead()
 
   if (!SPIFFS.exists(Return_file_confing_path(wifi_file_path)))
   {
-    Serial.println("file " + Return_file_confing_path(wifi_file_path) + "is not exist.");
+    Serial.println("file " + Return_file_confing_path(wifi_file_path) + " is not exist.");
     network.AS_IP = IPAddress(192, 168, 1, 200);
     network.AS_Gateway = IPAddress(192, 168, 1, 1);
     network.AS_Subnet = IPAddress(255, 255, 255, 0);
@@ -137,8 +138,8 @@ void sead()
     network.AS_Password = "SL2580617418@sh";
     network.AS_Dhcp = false;
 
-    network.AP_IP = IPAddress(192, 168, 1, 250);
-    network.AP_Gateway = IPAddress(192, 168, 1, 250);
+    network.AP_IP = IPAddress(192, 168, 2, 250);
+    network.AP_Gateway = IPAddress(192, 168, 2, 250);
     network.AP_Subnet = IPAddress(255, 255, 255, 0);
     network.AP_Ssid = "ESPIOTAccessPoint";
     network.AP_Password = "@dminIOT";
@@ -153,18 +154,18 @@ void sead()
 
   if (!SPIFFS.exists(Return_file_confing_path(account_file_path)))
   {
-    Serial.println("file " + Return_file_confing_path(account_file_path) + "is not exist.");
+    Serial.println("file " + Return_file_confing_path(account_file_path) + " is not exist.");
     Account.Username = "admin";
     Account.Password = "@dmin";
     write_account_config();
   }
   else
   {
-    Serial.println("file " + Return_file_confing_path(account_file_path) + "is exist.");
+    Serial.println("file " + Return_file_confing_path(account_file_path) + " is exist.");
   }
   if (!SPIFFS.exists(Return_file_confing_path(ntp_file_path)))
   {
-    Serial.println("file " + Return_file_confing_path(ntp_file_path) + "is not exist.");
+    Serial.println("file " + Return_file_confing_path(ntp_file_path) + " is not exist.");
     ntp.server = "ntp.day.ir";
     ntp.state = false;
     ntp.timeZone = "3.5";
@@ -172,12 +173,12 @@ void sead()
   }
   else
   {
-    Serial.println("file " + Return_file_confing_path(ntp_file_path) + "is exist.");
+    Serial.println("file " + Return_file_confing_path(ntp_file_path) + " is exist.");
   }
 
   if (!SPIFFS.exists(Return_file_confing_path(ftp_file_path)))
   {
-    Serial.println("file " + Return_file_confing_path(ftp_file_path) + "is not exist.");
+    Serial.println("file " + Return_file_confing_path(ftp_file_path) + " is not exist.");
     ftp.Username = "admin";
     ftp.Password = "admin123";
     ftp.state = false;
@@ -185,11 +186,11 @@ void sead()
   }
   else
   {
-    Serial.println("file " + Return_file_confing_path(ftp_file_path) + "is exist.");
+    Serial.println("file " + Return_file_confing_path(ftp_file_path) + " is exist.");
   }
   if (!SPIFFS.exists(Return_file_confing_path(alarm_file_path)))
   {
-    Serial.println("file " + Return_file_confing_path(alarm_file_path) + "is not exist.");
+    Serial.println("file " + Return_file_confing_path(alarm_file_path) + " is not exist.");
     for (int i = 0; i < 8; i++)
     {
       AlarmsInfo[i].hour = 0;
@@ -201,8 +202,24 @@ void sead()
   }
   else
   {
-    Serial.println("file " + Return_file_confing_path(alarm_file_path) + "is exist.");
+    Serial.println("file " + Return_file_confing_path(alarm_file_path) + " is exist.");
   }
+
+  /*if (!SPIFFS.exists(Return_file_confing_path(rele_file_path)))
+  {
+    Serial.println("file " + Return_file_confing_path(rele_file_path) + "is not exist.");
+    for (int i = 0; i < 4; i++)
+    {
+      int pin = ReturnRelePin(i);
+      RelesInfo[i].Rele = pin;
+      RelesInfo[i].Active = false;
+    }
+    write_rele_config();
+  }
+  else
+  {
+    Serial.println("file " + Return_file_confing_path(rele_file_path) + "is exist.");
+  }*/
 }
 
 void setup()
@@ -212,8 +229,6 @@ void setup()
   Serial.println("Wellcome");
   Serial.println("Booting Sketch...");
   Serial.println("VERSION 2");
-
-  SetDefultReleInfo();
 
   if (SPIFFS.begin())
   {
@@ -230,6 +245,8 @@ void setup()
 
   read_All_config();
 
+  SetDefultReleInfo();
+
   RTCConfig();
 
   NTPConfig();
@@ -244,8 +261,8 @@ void setup()
   }
 
   List_of_file();
-  //wifi_config();
-  Run_station();
+  wifi_config();
+  //Run_station();
   WebServerConfig();
 }
 
@@ -281,6 +298,7 @@ void read_All_config()
   read_ntp_config();
   read_ftp_config();
   read_alarm_config();
+  //read_rele_config();
 }
 String Return_file_confing_path(File_Path_name key)
 {
@@ -308,7 +326,10 @@ void Json_Write_File(String Path, JsonObject &Data)
 
   if (file)
   {
-    Data.printTo(file);
+    String datadata;
+    Data.printTo(datadata);
+    Serial.println(datadata);
+    file.println(datadata);
     file.close();
     Serial.println("File was written  -> " + Path);
   }
@@ -335,6 +356,42 @@ String Json_Read_File(String Path)
     return "";
   }
 }
+
+/*void read_rele_config()
+{
+  String Data = Json_Read_File(Return_file_confing_path(rele_file_path));
+  if (Data != "")
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.parseObject(Data);
+    if (json.success())
+    {
+      for (int i = 0; i < 4; i++)
+      {
+        String objkey = "rele " + String(i + 1);
+        Serial.println("========================" + json[objkey]["rele"].as<String>().toInt());
+        //RelesInfo[i].Rele = json[objkey]["rele"].as<String>().toInt();
+        RelesInfo[i].Active = String_to_bool(json[objkey]["Active"].as<String>());
+      }
+    }
+    
+  }
+}
+
+void write_rele_config()
+{
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &json = jsonBuffer.createObject();
+
+  for (int i = 0; i < 4; i++)
+  {
+    String objkey = "rele " + String(i + 1);
+    JsonObject &_json = json.createNestedObject("objkey");
+    _json["rele"] = String(RelesInfo[i].Rele);
+    _json["Active"] = bool_to_String(RelesInfo[i].Active);
+  }
+  Json_Write_File(Return_file_confing_path(rele_file_path), json);
+}*/
 void read_account_config()
 {
   String Data = Json_Read_File(Return_file_confing_path(account_file_path));
@@ -347,7 +404,6 @@ void read_account_config()
       Account.Username = json["Username"].as<String>();
       Account.Password = json["Password"].as<String>();
     }
-    json.end();
   }
 }
 
@@ -360,7 +416,6 @@ void write_account_config()
   json["Password"] = Account.Password;
 
   Json_Write_File(Return_file_confing_path(account_file_path), json);
-  json.end();
 }
 
 void read_wifi_config()
@@ -388,7 +443,6 @@ void read_wifi_config()
 
       network.mode = json["mode"].as<String>().toInt();
     }
-    json.end();
   }
 }
 
@@ -416,7 +470,6 @@ void write_wifi_config()
   AccessPoint_json["Password"] = network.AP_Password;
 
   Json_Write_File(Return_file_confing_path(wifi_file_path), json);
-  json.end();
 }
 
 void read_ntp_config()
@@ -477,6 +530,7 @@ void write_ftp_config()
 void read_alarm_config()
 {
   String Data = Json_Read_File(Return_file_confing_path(alarm_file_path));
+  Serial.println(Data);
   if (Data != "")
   {
     DynamicJsonBuffer jsonBuffer;
@@ -485,14 +539,26 @@ void read_alarm_config()
     {
       for (int i = 0; i < 8; i++)
       {
-        String objkey = "alarm " + String(i + 1);
+        String objkey = "alarm" + String(i + 1);
         AlarmsInfo[i].hour = json[objkey]["hour"].as<String>().toInt();
         AlarmsInfo[i].minute = json[objkey]["minute"].as<String>().toInt();
         AlarmsInfo[i].period = json[objkey]["period"].as<String>().toInt();
         AlarmsInfo[i].TimerIsActive = String_to_bool(json[objkey]["TimerIsActive"].as<String>());
         Serial.println("get timer " + String(i + 1) + " is set : " + String(AlarmsInfo[i].hour) + " : " + String(AlarmsInfo[i].minute) + " for " + String(AlarmsInfo[i].period) + "minute");
+        int _hour, _minute;
+        PeriodConvertToTime(AlarmsInfo[i].period, AlarmsInfo[i].hour, AlarmsInfo[i].minute, _hour, _minute);
+        Serial.println("end time : " + String(_hour) + ":" + String(_minute));
+        Serial.println();
       }
     }
+    else
+    {
+      Serial.println("json error");
+    }
+  }
+  else
+  {
+    Serial.println("data error");
   }
 }
 
@@ -503,15 +569,17 @@ void write_alarm_config()
 
   for (int i = 0; i < 8; i++)
   {
-    String objkey = "alarm " + String(i + 1);
-    JsonObject &_json = json.createNestedObject("objkey");
-    json["hour"] = String(AlarmsInfo[i].hour);
-    json["minute"] = String(AlarmsInfo[i].minute);
-    json["period"] = String(AlarmsInfo[i].period);
-    json["TimerIsActive"] = bool_to_String(AlarmsInfo[i].TimerIsActive);
+    String objkey = "alarm" + String(i + 1);
+    JsonObject &_json = json.createNestedObject(objkey);
+    _json["hour"] = String(AlarmsInfo[i].hour);
+    _json["minute"] = String(AlarmsInfo[i].minute);
+    _json["period"] = String(AlarmsInfo[i].period);
+    _json["TimerIsActive"] = bool_to_String(AlarmsInfo[i].TimerIsActive);
     Serial.println("set timer " + String(i + 1) + " is set : " + String(AlarmsInfo[i].hour) + " : " + String(AlarmsInfo[i].minute) + " for " + String(AlarmsInfo[i].period) + "minute");
   }
   Json_Write_File(Return_file_confing_path(alarm_file_path), json);
+
+  read_alarm_config();
 }
 
 void wifi_config()
@@ -607,8 +675,8 @@ void Run_AccessPoint()
 }
 void Run_Multi()
 {
-  Run_station();
   Run_AccessPoint();
+  Run_station();
 }
 
 IPAddress String_to_IP(String str)
@@ -773,7 +841,7 @@ int TimeConvertToInt(int hour, int minutes)
   return (hour * 60) + minutes;
 }
 
-int *PeriodConvertToTime(int period, int hour, int minutes)
+void PeriodConvertToTime(int period, int hour, int minutes, int &Rhour, int &Rminutes)
 {
   int h = period / 60;
   int m = period % 60;
@@ -786,16 +854,22 @@ int *PeriodConvertToTime(int period, int hour, int minutes)
   }
   if (tempH > 23)
     tempH = tempH - 24;
-  int Mytime[] = {tempH, tempM};
-  return Mytime;
+  Rhour = tempH;
+  Rminutes = tempM;
 }
 bool IsEqualTimeToNow(int hour, int minute)
 {
   TimeDT timeNow = GetTime();
   if (hour == timeNow.Hour && minute == timeNow.Minute)
+  {
     return true;
+    Serial.println("stop yes");
+  }
   else
+  {
+    Serial.println("stop no");
     return false;
+  }
 }
 bool IsStartAlarm(AlarmInfoDT alarm)
 {
@@ -803,8 +877,9 @@ bool IsStartAlarm(AlarmInfoDT alarm)
 }
 bool IsEndAlarm(AlarmInfoDT alarm)
 {
-  int *temptime = PeriodConvertToTime(alarm.period, alarm.hour, alarm.minute);
-  return IsEqualTimeToNow(temptime[0], temptime[1]);
+  int _hour, _minute;
+  PeriodConvertToTime(alarm.period, alarm.hour, alarm.minute, _hour, _minute);
+  return IsEqualTimeToNow(_hour, _minute);
 }
 bool IsRunAlarm(int ID)
 {
@@ -813,8 +888,9 @@ bool IsRunAlarm(int ID)
   AlarmInfoDT info = AlarmsInfo[ID];
   int IntStartAlarm = TimeConvertToInt(info.hour, info.minute);
 
-  int *EndTime = PeriodConvertToTime(AlarmsInfo[ID].period, AlarmsInfo[ID].hour, AlarmsInfo[ID].minute);
-  int IntEndTime = TimeConvertToInt(EndTime[0], EndTime[1]);
+  int _hour, _minute;
+  PeriodConvertToTime(AlarmsInfo[ID].period, AlarmsInfo[ID].hour, AlarmsInfo[ID].minute, _hour, _minute);
+  int IntEndTime = TimeConvertToInt(_hour, _minute);
 
   int IntNowTime = TimeConvertToInt(time.Hour, time.Minute);
 
@@ -954,6 +1030,7 @@ String return_javaScript()
   js += "var reqnet = new XMLHttpRequest();";
   js += "var reqauth = new XMLHttpRequest();";
   js += "var reqscan = new XMLHttpRequest();";
+  js += "var reqsntp = new XMLHttpRequest();";
   js += "var reqReleStatus = new XMLHttpRequest();";
   js += "var reqChangeReleStatus = new XMLHttpRequest();";
 
@@ -973,6 +1050,8 @@ String return_javaScript()
   js += "function chkpassFunction() { var x = document.forms['chkForm']['OLDPASSWORD'].value; var y = document.forms['chkForm']['NEWPASSWORD'].value; var z = document.forms['chkForm']['RNPASSWORD'].value; if (x == ''";
   js += ") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}}";
 
+  js += "function responseNtpStatus() { if (this.readyState == 4 && this.status == 200) {  alert('عملیات با موفقیت انجام شد . ');}}";
+  js += "function on_off_ntp(){ reqsntp.open('Get', '/on_off_ntp', true); reqsntp.onreadystatechange = responseNtpStatus;reqsntp.send();}";
   return js;
 }
 String BotomHtml()
@@ -1003,7 +1082,11 @@ void handle_on_off_ntp()
     server.send(401);
     return;
   }
-  ntp.state = !ntp.state;
+  if (ntp.state == true)
+    ntp.state = false;
+  else
+    ntp.state = true;
+  Serial.println("ntp state : " + bool_to_String(ntp.state));
   write_ntp_config();
 
   server.sendHeader("Location", "/setting");
@@ -1012,6 +1095,15 @@ void handle_on_off_ntp()
 }
 void handledefultSetting()
 {
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(401);
+    return;
+  }
+  SPIFFS.format();
+  sead();
   ESP.reset();
 }
 void Send_rele_status()
@@ -1037,6 +1129,61 @@ void Send_rele_status()
   json.printTo(releObj);
   server.send(200, "text/plain", releObj);
 }
+
+void Scan_wifi()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  Serial.println("Scaning network");
+  int number = WiFi.scanNetworks();
+  Serial.println("Completed network");
+
+  if (number == 0)
+  {
+    Serial.println("no wifif station find");
+  }
+  else
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &json = jsonBuffer.createObject();
+    JsonArray &json_station = json.createNestedArray("station");
+    for (int i = 0; i < number; i++)
+    {
+      byte etype = WiFi.encryptionType(i);
+      String type = "";
+      switch (etype)
+      {
+      case 2:
+        type = "TKIP (WPA)";
+        break;
+      case 5:
+        type = "WEP";
+        break;
+      case 4:
+        type = "AES (WPA)";
+        break;
+      case 7:
+        type = "NONE";
+        break;
+      case 8:
+        type = "AUTO";
+        break;
+      }
+      String ssid = WiFi.SSID(i);
+      Serial.println(String(i + 1) + " --> SSID : " + ssid + "- RSSI : " + String(100 + WiFi.RSSI(i)) + "- encryption : " + type);
+      json_station.add(ssid);
+    }
+    String releObj = "";
+    json.printTo(releObj);
+    server.send(200, "text/plain", releObj);
+  }
+}
+
 void ReleChangeState(int id)
 {
 
@@ -1132,8 +1279,8 @@ void handleLogin()
   }
   String content = Tophtml("Login");
   content += "<body>";
-  content += "<form method='POST' class='login' action='/login'><h1>ورود</h1><input type='user' name='USERNAME' class='login-input' placeholder='نام کاربری'>";
-  content += "<input type='pass' name='PASSWORD' class='login-input' placeholder='کلمه عبور'><input type='submit' name='SUBMIT' value='ورود' class='login-submit'></form>";
+  content += "<form method='POST' class='login' action='/login'><h1>ورود</h1><input type='text' name='USERNAME' class='login-input' placeholder='نام کاربری'>";
+  content += "<input type='password' name='PASSWORD' class='login-input' placeholder='کلمه عبور'><input type='submit' name='SUBMIT' value='ورود' class='login-submit'></form>";
   content += "</body></html>";
   server.send(200, "text/html", content);
 }
@@ -1395,12 +1542,12 @@ void handleSetting()
   String content = Tophtml("تنظیمات");
   content += "<body>";
   content += NavBar();
-  content += "<form class='login' method='POST' action='/on_off_ntp'><div class='onoffsw'><label class='labelsswitch'>سرور ntp : </label><label class='switch'>";
+  content += "<div class='login'><div class='onoffsw'><label class='labelsswitch'>سرور ntp : </label><label class='switch'>";
   if (ntp.state)
-    content += "<input type='checkbox' cheaked id='ntp'/>";
+    content += "<input type='checkbox' cheaked id='ntp' onchange='function on_off_ntp()' />";
   else
-    content += "<input type='checkbox'  id='ntp'/>";
-  content += "<span class='slider round'></span></label></div></form>";
+    content += "<input type='checkbox'  id='ntp' onchange='function on_off_ntp()'/>";
+  content += "<span class='slider round'></span></label></div></div>";
 
   content += "<form method='POST' action='/setting_ftp' class='login'><h1>تنظیمات ftp </h1><div class='onoffsw'><label class='labelsswitch'>سرور ftp : </label><label class='switch'>";
   if (ftp.state)
@@ -1438,6 +1585,8 @@ void WebServerConfig()
   server.on("/chkpass", handleChangePass);
   server.on("/setting_ftp", handlesetting_ftp);
   server.on("/defult", handledefultSetting);
+  server.on("/setalerm", handleSetAlrem);
+  server.on("/Scan", Scan_wifi);
 
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
   const char *headerkeys[] = {"User-Agent", "Cookie"};
