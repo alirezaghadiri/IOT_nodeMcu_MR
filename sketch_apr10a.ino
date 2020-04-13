@@ -1631,6 +1631,7 @@ void WebServerConfig()
   const char *headerkeys[] = {"User-Agent", "Cookie"};
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
   server.collectHeaders(headerkeys, headerkeyssize);
+  httpUpdater.setup(&server);
   server.begin();
   Serial.println("HTTP server started");
 }
