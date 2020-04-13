@@ -601,11 +601,9 @@ bool Run_station()
 {
   digitalWrite(2, 0);
   Serial.println("run the wifi to mode Station");
-  ESP.eraseConfig();
   WiFi.setAutoConnect(true);
   WiFi.disconnect(true);
   WiFi.hostname("IOT");
-  WiFi.mode(WIFI_STA);
   if (network.AS_Password == NULL)
     WiFi.begin(network.AS_Ssid.c_str());
   else
@@ -660,7 +658,7 @@ void Run_AccessPoint()
 {
   digitalWrite(2, 0);
   Serial.println("run the wifi to mode AccessPoint");
-  WiFi.mode(WIFI_AP);
+  //WiFi.mode(WIFI_AP);
   WiFi.softAPConfig(network.AP_IP, network.AP_Gateway, network.AP_Subnet);
   if (network.AP_Password != NULL)
     WiFi.softAP(network.AP_Ssid.c_str(), network.AP_Password.c_str());
@@ -675,8 +673,36 @@ void Run_AccessPoint()
 }
 void Run_Multi()
 {
-  Run_AccessPoint();
-  Run_station();
+  ESP.eraseConfig();
+  switch (network.mode)
+  {
+  case 1:
+  {
+    WiFi.mode(WIFI_STA);
+    if (!Run_station())
+    {
+      WiFi.mode(WIFI_AP);
+      Run_AccessPoint();
+    }
+    break;
+  }
+  case 2:
+  {
+    WiFi.mode(WIFI_AP);
+    Run_AccessPoint();
+    break;
+  }
+  case 3:
+  {
+    WiFi.mode(WIFI_AP_STA);
+    Run_AccessPoint();
+    Run_station();
+    break;
+  }
+
+  default:
+    break;
+  }
 }
 
 IPAddress String_to_IP(String str)
