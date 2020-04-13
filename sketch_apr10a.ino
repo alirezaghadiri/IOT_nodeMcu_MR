@@ -1608,6 +1608,22 @@ void handleSetting()
   content += BotomHtml();
   server.send(200, "text/html", content);
 }
+void handleNotFound()
+{
+  String message = "File Not Found\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET) ? "GET" : "POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i = 0; i < server.args(); i++)
+  {
+    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+}
 
 void WebServerConfig()
 {
@@ -1626,8 +1642,9 @@ void WebServerConfig()
   server.on("/defult", handledefultSetting);
   server.on("/setalerm", handleSetAlrem);
   server.on("/Scan", Scan_wifi);
-
+  server.onNotFound(handleNotFound);
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
+
   const char *headerkeys[] = {"User-Agent", "Cookie"};
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
   server.collectHeaders(headerkeys, headerkeyssize);
