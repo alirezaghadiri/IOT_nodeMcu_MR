@@ -126,7 +126,6 @@ void SetDefultReleInfo()
 
 void sead()
 {
-
   if (!SPIFFS.exists(Return_file_confing_path(wifi_file_path)))
   {
     Serial.println("file " + Return_file_confing_path(wifi_file_path) + " is not exist.");
@@ -263,11 +262,13 @@ void setup()
   List_of_file();
   wifi_config();
   WebServerConfig();
+  ftpSrv.begin(ftp.Username, ftp.Password);
 }
 
 void loop()
 {
   server.handleClient();
+  ftpSrv.handleFTP();
   Alerm();
   PriodAlarm();
 }
