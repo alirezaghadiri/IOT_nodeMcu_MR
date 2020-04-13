@@ -262,7 +262,6 @@ void setup()
 
   List_of_file();
   wifi_config();
-  //Run_station();
   WebServerConfig();
 }
 
@@ -1570,7 +1569,7 @@ void handleSetting()
   content += NavBar();
   content += "<div class='login'><div class='onoffsw'><label class='labelsswitch'>سرور ntp : </label><label class='switch'>";
   if (ntp.state)
-    content += "<input type='checkbox' cheaked id='ntp' onchange='function on_off_ntp()' />";
+    content += "<input type='checkbox' cheaked id='ntp' onchange='on_off_ntp()' />";
   else
     content += "<input type='checkbox'  id='ntp' onchange='function on_off_ntp()'/>";
   content += "<span class='slider round'></span></label></div></div>";
