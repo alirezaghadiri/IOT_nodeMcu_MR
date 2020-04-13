@@ -1372,7 +1372,7 @@ void handletime()
     NowTime.Day = server.arg("DAY").toInt();
     setTimeFormRTC();
   }
-  
+
   UpdateTime();
   String content = Tophtml();
   content += "<body>";
@@ -1385,8 +1385,8 @@ void handletime()
   content += "<input type='text' name='YEAR' disabled class='login-input' placeholder='سال' value=" + String(NowTime.Year) + ">";
   content += "<input type='text' name='MONTH' disabled class='login-input' placeholder='ماه' value=" + String(NowTime.Month) + ">";
   content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(NowTime.Day) + ">";
-  if(!ntp.state)
-  content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'>";
+  if (!ntp.state)
+    content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'>";
   content += "</form></body>";
   content += BotomHtml();
   server.send(200, "text/html", content);
@@ -1624,6 +1624,69 @@ void handleNotFound()
   }
   server.send(404, "text/plain", message);
 }
+void handleSettingIP()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  if (server.hasArg("as-ip") && server.hasArg("as-gateway") && server.hasArg("as-subnet") && server.hasArg("as-dns")
+  && server.hasArg("ap-ssid")&& server.hasArg("ap-password")&& server.hasArg("a‌p-ip")&& server.hasArg("ap-subnet")
+  && server.hasArg("wifimode"))
+  {
+    
+    network.AS_IP = String_to_IP(server.arg("as-ip"));
+    network.AS_Gateway = String_to_IP(server.arg("as-gateway"));
+    network.AS_Subnet = String_to_IP(server.arg("as-subnet"));
+    network.AS_Dns = String_to_IP(server.arg("as-dns"));
+
+    network.AP_IP = String_to_IP(server.arg("a‌p-ip"));
+    network.AP_Gateway = String_to_IP(server.arg("a‌p-ip"));
+    network.AP_Subnet = String_to_IP(server.arg("ap-subnet"));
+    network.AP_Ssid = server.arg("ap-ssid");
+    network.AP_Password = server.arg("ap-password");
+    if(server.arg("wifimode")=="1")
+    network.mode =  Station;
+    if(server.arg("wifimode")=="2")
+    network.mode =  AccessPoint;
+    if(server.arg("wifimode")=="3")
+    network.mode =  both;
+   
+
+    write_wifi_config();
+
+    wifi_config();
+  }
+  String content = Tophtml();
+  content += "<body>";
+  content += NavBar();
+  content += " <form method='POST' class='login' action='/settingip'>";
+  content += "<label for='wifimode'>Choose a car:</label>";
+  content +="<select class='login-input' id='wifimode' name='wifimode'>";
+  content +="<option value='1'>station</option>";
+  content +="<option value='2'>AccessPoint</option>";
+  content +="<option value='3'>Multi(AP&SA)</option>";
+  content +="</select>";
+  content += "<h1> تنظیمات شبکه سوییچ</h1>";
+  content += "<input type='text' name='as-ip' class='login-input' placeholder='Static Ip' value=" + network.AS_IP.toString() + ">";
+  content += "<input type='text' name='as-gateway' class='login-input' placeholder='Gateway' value=" + network.AS_Gateway.toString() + ">";
+  content += "<input type='text' name='as-subnet' class='login-input' placeholder='Subnet' value=" + network.AS_Subnet.toString() + ">";
+  content += "<input type='text' name='as-dns' class='login-input' placeholder='dns' value=" + network.AS_Dns.toString() + ">";
+
+  content += "<h1> تنظیمات شبکه داخلی</h1>";
+
+  content += "<input type='text' name='ap-ssid' class='login-input' placeholder='ssid' value=" + network.AP_Ssid + ">";
+  content += "<input type='text' name='ap-password' class='login-input' placeholder='password' value=" + network.AP_Password + ">";
+  content += "<input type='text' name='a‌p-ip' class='login-input' placeholder='Static Ip' value=" + network.AP_IP.toString() + ">";
+  content += "<input type='text' name='ap-subnet' class='login-input' placeholder='Subnet' value=" + network.AP_Subnet.toString() + ">";
+
+  content += "<input type='submit' name='SUBMIT' value='ذخیره' class='login-submit'></form>";
+  content += "</body></html>";
+  server.send(200, "text/html", content);
+}
 
 void WebServerConfig()
 {
@@ -1642,6 +1705,7 @@ void WebServerConfig()
   server.on("/defult", handledefultSetting);
   server.on("/setalerm", handleSetAlrem);
   server.on("/Scan", Scan_wifi);
+  server.on("/settingip", handleSettingIP);
   server.onNotFound(handleNotFound);
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
 
