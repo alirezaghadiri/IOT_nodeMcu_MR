@@ -852,10 +852,10 @@ TimeDT GetTime()
     temp = GetTimeFormNTP();
   else
     temp = GetTimeFormRTC();
-  if (IssummerTime(temp.Month))
-    temp.Hour++;
   return temp;
 }
+
+
 void UpdateTime()
 {
   NowTime = GetTime();
