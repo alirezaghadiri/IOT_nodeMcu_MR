@@ -9,6 +9,9 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
 
+#define SCAN_PERIOD_TIMER 600
+long lastScanTimer;
+
 struct TimeDT
 {
   int Hour;
@@ -269,8 +272,17 @@ void loop()
 {
   server.handleClient();
   ftpSrv.handleFTP();
-  Alerm();
-  PriodAlarm();
+  Timer();
+}
+
+void Timer()
+{
+  if (millis() - lastScanTimer >= SCAN_PERIOD_TIMER)
+  {
+    Alerm();
+    PriodAlarm();
+    lastScanTimer = millis();
+  }
 }
 
 void List_of_file()
@@ -829,10 +841,12 @@ TimeDT GetTimeFormNTP()
 
 TimeDT GetTime()
 {
+  TimeDT temp;
   if (ntp.state)
-    return GetTimeFormNTP();
+    temp =GetTimeFormNTP();
   else
-    return GetTimeFormRTC();
+    temp =GetTimeFormRTC();
+  return temp;
 }
 void UpdateTime()
 {
@@ -887,15 +901,9 @@ bool IsEqualTimeToNow(int hour, int minute)
 {
   TimeDT timeNow = GetTime();
   if (hour == timeNow.Hour && minute == timeNow.Minute)
-  {
     return true;
-    Serial.println("stop yes");
-  }
   else
-  {
-    Serial.println("stop no");
     return false;
-  }
 }
 bool IsStartAlarm(AlarmInfoDT alarm)
 {
