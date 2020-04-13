@@ -843,9 +843,12 @@ TimeDT GetTime()
 {
   TimeDT temp;
   if (ntp.state)
-    temp =GetTimeFormNTP();
+    temp = GetTimeFormNTP();
   else
-    temp =GetTimeFormRTC();
+    temp = GetTimeFormRTC();
+
+  if (IssummerTime(temp.Month))
+    temp.Hour++;
   return temp;
 }
 void UpdateTime()
@@ -1350,7 +1353,7 @@ void handleRoot()
   server.send(200, "text/html", contaxt);
 }
 
-void handleRTCtime()
+void handletime()
 {
   if (!is_authentified())
   {
@@ -1369,20 +1372,22 @@ void handleRTCtime()
     NowTime.Day = server.arg("DAY").toInt();
     setTimeFormRTC();
   }
-  TimeDT rtctime = GetTimeFormRTC();
+  
+  UpdateTime();
   String content = Tophtml();
   content += "<body>";
   content += NavBar();
   content += "<form method='POST' class='login' action='/settime'><h1>تنظیم ساعت</h1>";
-  content += "<input type='text' name='Hour'  disabled class='login-input' placeholder='ساعت' value=" + String(rtctime.Hour) + ">";
-  content += "<input type='text' name='MIN'  disabled class='login-input' placeholder='دقیقه'value=" + String(rtctime.Minute) + ">";
+  content += "<input type='text' name='Hour'  disabled class='login-input' placeholder='ساعت' value=" + String(NowTime.Hour) + ">";
+  content += "<input type='text' name='MIN'  disabled class='login-input' placeholder='دقیقه'value=" + String(NowTime.Minute) + ">";
   content += "<br>";
   content += "<form method='POST' class='login' action='/login'><h1>تنظیم تاریخ</h1>";
-  content += "<input type='text' name='YEAR' disabled class='login-input' placeholder='سال' value=" + String(rtctime.Year) + ">";
-  content += "<input type='text' name='MONTH' disabled class='login-input' placeholder='ماه' value=" + String(rtctime.Month) + ">";
-  content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(rtctime.Day) + ">";
-  content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'></form>";
-  content += "</body>";
+  content += "<input type='text' name='YEAR' disabled class='login-input' placeholder='سال' value=" + String(NowTime.Year) + ">";
+  content += "<input type='text' name='MONTH' disabled class='login-input' placeholder='ماه' value=" + String(NowTime.Month) + ">";
+  content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(NowTime.Day) + ">";
+  if(!ntp.state)
+  content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'>";
+  content += "</form></body>";
   content += BotomHtml();
   server.send(200, "text/html", content);
 }
@@ -1611,7 +1616,7 @@ void WebServerConfig()
   server.on("/releStatus", Send_rele_status);
   server.on("/releChangeStatus", handle_ReleChangeState);
   server.on("/login", handleLogin);
-  server.on("/RTCtime", handleRTCtime);
+  server.on("/RTCtime", handletime);
   server.on("/chkpass", handleChangePass);
   server.on("/setting", handleSetting);
   server.on("/restart", handle_restart);
