@@ -98,8 +98,11 @@ AlarmInfoDT AlarmsInfo[8];
 FtpServer ftpSrv;
 ESP8266WebServer server(80);
 RtcDS3231<TwoWire> Rtc(Wire);
-SNTPtime NTPch("ntp.day.ir");
+//SNTPtime NTPch("ntp.day.ir");
+SNTPtime NTPch("ir.pool.ntp.org");
 ESP8266HTTPUpdateServer httpUpdater;
+
+
 
 int ReturnRelePin(int ID)
 {
@@ -226,6 +229,9 @@ void sead()
 
 void setup()
 {
+  pinMode(2, OUTPUT);
+  digitalWrite(2, 0);
+  ESP.eraseConfig();
   Serial.begin(115200);
   delay(1000);
   Serial.println("Wellcome");
@@ -243,19 +249,17 @@ void setup()
 
   Serial.println("cheaking  confing file");
   sead();
-  Serial.println("cheaked   confing file");
+  Serial.println("checked   confing file");
 
   read_All_config();
 
   SetDefultReleInfo();
 
+  Serial.flush();
+
   RTCConfig();
 
   NTPConfig();
-
-  TimeDT now = GetTime();
-  Serial.println(String(now.Year) + "/" + String(now.Month) + "/" + String(now.Day) + " - " +
-                 String(now.Hour) + ":" + String(now.Minute) + ":" + String(now.Second));
 
   for (int i = 0; i < 8; i++)
   {
@@ -263,14 +267,29 @@ void setup()
   }
 
   List_of_file();
+
+  delay(200);
   wifi_config();
+  delay(300);
+  if (!cheak_host(network.AS_Dns))
+    ntp.state = false;
+
+  TimeDT now = GetTime();
+  Serial.println(String(now.Year) + "/" + String(now.Month) + "/" + String(now.Day) + " - " +
+                 String(now.Hour) + ":" + String(now.Minute) + ":" + String(now.Second));
+
   WebServerConfig();
-  ftpSrv.begin(ftp.Username, ftp.Password);
+
+  ftpSetUserPass();
+
+  lastScanTimer = millis();
+  digitalWrite(2, 1);
 }
 
 void loop()
 {
   server.handleClient();
+  if(ftp.state)
   ftpSrv.handleFTP();
   Timer();
 }
@@ -596,18 +615,33 @@ void write_alarm_config()
 
 void wifi_config()
 {
+  digitalWrite(2, 0);
   switch (network.mode)
   {
-  case Station:
-    Run_station();
+  case 1:
+  {
+    WiFi.mode(WIFI_STA);
+    if (!Run_station())
+    {
+      WiFi.mode(WIFI_AP);
+      Run_AccessPoint();
+    }
     break;
-  case AccessPoint:
+  }
+  case 2:
+  {
+    WiFi.mode(WIFI_AP);
     Run_AccessPoint();
     break;
-  case both:
+  }
+  case 3:
+  {
+    WiFi.mode(WIFI_AP_STA);
     Run_Multi();
     break;
   }
+  }
+  digitalWrite(2, 1);
 }
 bool Run_station()
 {
@@ -685,36 +719,8 @@ void Run_AccessPoint()
 }
 void Run_Multi()
 {
-  ESP.eraseConfig();
-  switch (network.mode)
-  {
-  case 1:
-  {
-    WiFi.mode(WIFI_STA);
-    if (!Run_station())
-    {
-      WiFi.mode(WIFI_AP);
-      Run_AccessPoint();
-    }
-    break;
-  }
-  case 2:
-  {
-    WiFi.mode(WIFI_AP);
-    Run_AccessPoint();
-    break;
-  }
-  case 3:
-  {
-    WiFi.mode(WIFI_AP_STA);
-    Run_AccessPoint();
-    Run_station();
-    break;
-  }
-
-  default:
-    break;
-  }
+  Run_AccessPoint();
+  Run_station();
 }
 
 IPAddress String_to_IP(String str)
@@ -822,12 +828,7 @@ bool IssummerTime(int _Month)
 TimeDT GetTimeFormNTP()
 {
   strDateTime datetime;
-  double zone = 0;
-  if (IssummerTime)
-    zone = ntp.timeZone.toDouble() + 1;
-  else
-    zone = ntp.timeZone.toDouble();
-  datetime = NTPch.getTime(zone, 0);
+  datetime = NTPch.getTime(3.5, 0);
   TimeDT temp;
   temp.Year = datetime.year;
   temp.Month = datetime.month;
@@ -839,6 +840,11 @@ TimeDT GetTimeFormNTP()
   return temp;
 }
 
+bool cheak_host(IPAddress host)
+{
+  return Ping.ping(host);
+}
+
 TimeDT GetTime()
 {
   TimeDT temp;
@@ -846,7 +852,6 @@ TimeDT GetTime()
     temp = GetTimeFormNTP();
   else
     temp = GetTimeFormRTC();
-
   if (IssummerTime(temp.Month))
     temp.Hour++;
   return temp;
@@ -1049,7 +1054,7 @@ String NavBar()
 {
   String nav = "<div class='topnav'>";
   nav += "<a href='/'>خانه</a>";
-  nav += "<a href='/RTCtime'>ساعت</a>";
+  nav += "<a href='/settime'>ساعت</a>";
   nav += "<a href='setalerm'>آلارم</a>";
   nav += "<a href='/adslmodem'>مودم</a>";
   nav += "<a href='/settingip'>شبکه</a>";
@@ -1088,7 +1093,15 @@ String return_javaScript()
   js += ") { alert('کلمه عبور وارد کنید . '); return false; } else if (y != z) { alert('تکرار کلمه عبور نادرست می باشد . '); return false;}}";
 
   js += "function responseNtpStatus() { if (this.readyState == 4 && this.status == 200) {  alert('عملیات با موفقیت انجام شد . ');}}";
-  js += "function on_off_ntp(){ reqsntp.open('Get', '/on_off_ntp', true); reqsntp.onreadystatechange = responseNtpStatus;reqsntp.send();}";
+  js += "function ntpChangeStatus(parm) {reqsntp.open('Get', '/on_off_ntp?state='+parm, true); reqsntp.onreadystatechange = responseNtpStatus;reqsntp.send();}";
+  js += "function on_off_ntp() {if (document.getElementById('ntp').checked) ntpChangeStatus('on');  else ntpChangeStatus('off');}";
+
+  js += "function SSidFunction() {remove_item_combo();}";
+  js += "var ScanCombo=document.getElementById('Scancombo');";
+  js += "function remove_item_combo(){ var i; for(i=ScanCombo.options.length-1;i>=0;i--){ ScanCombo.remove(i);}ProcessSCan();}";
+  js += "function responseScan() { if (this.readyState == 4 && this.status == 200) {var myobj = JSON.parse(this.responseText); for(i=0;i<myobj.station.length;i++){ var opt=document.createElement('option');opt.value=myobj.station[i];opt.innerHTML=myobj.station[i];ScanCombo.appendChild(opt); }}}";
+  js += "function ProcessSCan() {reqnet.open('Get', '/Scan', true);reqnet.onreadystatechange = responseScan;reqnet.send();}";
+
   return js;
 }
 String BotomHtml()
@@ -1107,7 +1120,7 @@ void handle_restart()
     server.send(401);
     return;
   }
-  ESP.restart();
+  ESP.reset();
 }
 
 void handle_on_off_ntp()
@@ -1119,16 +1132,20 @@ void handle_on_off_ntp()
     server.send(401);
     return;
   }
-  if (ntp.state == true)
-    ntp.state = false;
-  else
-    ntp.state = true;
-  Serial.println("ntp state : " + bool_to_String(ntp.state));
-  write_ntp_config();
-
-  server.sendHeader("Location", "/setting");
-  server.sendHeader("Cache-Control", "no-cache");
-  server.send(301);
+  if (server.hasArg("state"))
+    if (cheak_host(network.AS_Dns))
+    {
+      if (server.arg("state") == "on")
+        ntp.state = true;
+      else
+        ntp.state = false;
+      write_ntp_config();
+      Serial.println(" internet ntp state" + bool_to_String(ntp.state));
+    }
+    else
+    {
+      Serial.println("no internet");
+    }
 }
 void handledefultSetting()
 {
@@ -1370,23 +1387,39 @@ void handletime()
     NowTime.Year = server.arg("YEAR").toInt();
     NowTime.Month = server.arg("MONTH").toInt();
     NowTime.Day = server.arg("DAY").toInt();
+    
+    Serial.println(String(NowTime.Year) + "/" + String(NowTime.Month) + "/" + String(NowTime.Day) + " - " +
+                 String(NowTime.Hour) + ":" + String(NowTime.Minute) + ":" + String(NowTime.Second));
+
     setTimeFormRTC();
   }
 
-  UpdateTime();
   String content = Tophtml();
   content += "<body>";
   content += NavBar();
   content += "<form method='POST' class='login' action='/settime'><h1>تنظیم ساعت</h1>";
-  content += "<input type='text' name='Hour'  disabled class='login-input' placeholder='ساعت' value=" + String(NowTime.Hour) + ">";
-  content += "<input type='text' name='MIN'  disabled class='login-input' placeholder='دقیقه'value=" + String(NowTime.Minute) + ">";
-  content += "<br>";
-  content += "<form method='POST' class='login' action='/login'><h1>تنظیم تاریخ</h1>";
-  content += "<input type='text' name='YEAR' disabled class='login-input' placeholder='سال' value=" + String(NowTime.Year) + ">";
-  content += "<input type='text' name='MONTH' disabled class='login-input' placeholder='ماه' value=" + String(NowTime.Month) + ">";
-  content += "<input type='text' name='DAY' disabled class='login-input' placeholder='روز' value=" + String(NowTime.Day) + ">";
   if (!ntp.state)
-    content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'>";
+  {
+    content += "<input type='text' name='Hour'   class='login-input' placeholder='ساعت' value=" + String(NowTime.Hour) + ">";
+    content += "<input type='text' name='MIN'   class='login-input' placeholder='دقیقه'value=" + String(NowTime.Minute) + ">";
+    content += "<br>";
+    content += "<h1>تنظیم تاریخ</h1>";
+    content += "<input type='text' name='YEAR'  class='login-input' placeholder='سال' value=" + String(NowTime.Year) + ">";
+    content += "<input type='text' name='MONTH'  class='login-input' placeholder='ماه' value=" + String(NowTime.Month) + ">";
+    content += "<input type='text' name='DAY'  class='login-input' placeholder='روز' value=" + String(NowTime.Day) + ">";
+    content += "<input type='submit' name='SUBMIT' value='تغییر' class='login-submit'></form>";
+  }
+  else
+  {
+    content += "<input type='text' name='Hour'   class='login-input' placeholder='ساعت' value=" + String(NowTime.Hour) + ">";
+    content += "<input type='text' name='MIN'   class='login-input' placeholder='دقیقه'value=" + String(NowTime.Minute) + ">";
+    content += "<br>";
+    content += "<h1>تنظیم تاریخ</h1>";
+    content += "<input type='text' name='YEAR'  class='login-input' placeholder='سال' value=" + String(NowTime.Year) + ">";
+    content += "<input type='text' name='MONTH'  class='login-input' placeholder='ماه' value=" + String(NowTime.Month) + ">";
+    content += "<input type='text' name='DAY'  class='login-input' placeholder='روز' value=" + String(NowTime.Day) + ">";
+    content += "<input type='submit' name='SUBMIT' value='همگام سازی ' class='login-submit'>";
+  }
   content += "</form></body>";
   content += BotomHtml();
   server.send(200, "text/html", content);
@@ -1424,15 +1457,19 @@ void handleChangePass()
 
   content += "<body>";
   content += NavBar();
-  content += "<form name='chkForm' action='#' onsubmit='return chkpassFunction()' method='post' class='login'>";
+  content += "<form name='chkForm' action='/chkpass' onsubmit='return chkpassFunction()' method='post' class='login'>";
   content += "<h1>تغییر پسورد</h1>";
-  content += "<input type='text' name='OLDPASSWORD' id='OLDPASSWORD' class='login-input' placeholder='کلمه عبور قبلی '>";
+  content += "<input type='password' name='OLDPASSWORD' id='OLDPASSWORD' class='login-input' placeholder='کلمه عبور قبلی '>";
   content += "<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور'>";
-  content += "<<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور '>";
+  content += "<input type='password' name='RNPASSWORD' id='RNPASSWORD' class='login-input' placeholder='تکرار کلمه عبور '>";
   content += "<input type='submit' value='تغییر' class='login-submit'></form>";
   content += "</body>";
   content += BotomHtml();
   server.send(200, "text/html", content);
+}
+
+void ftpSetUserPass(){
+  ftpSrv.begin(ftp.Username,ftp.Password);
 }
 void handleSetAlrem()
 {
@@ -1563,11 +1600,12 @@ void handlesetting_ftp()
     ftp.Username = server.arg("USERNAME");
     ftp.Password = server.arg("PASSWORD");
     write_ftp_config();
+    ftpSetUserPass();
   }
+    server.sendHeader("Location", "/setting");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
 
-  server.sendHeader("Location", "/setting");
-  server.sendHeader("Cache-Control", "no-cache");
-  server.send(301);
 }
 void handleSetting()
 {
@@ -1583,19 +1621,21 @@ void handleSetting()
   content += NavBar();
   content += "<div class='login'><div class='onoffsw'><label class='labelsswitch'>سرور ntp : </label><label class='switch'>";
   if (ntp.state)
-    content += "<input type='checkbox' cheaked id='ntp' onchange='on_off_ntp()' />";
+    content += "<input type='checkbox' checked id='ntp' onchange='on_off_ntp()' />";
   else
-    content += "<input type='checkbox'  id='ntp' onchange='function on_off_ntp()'/>";
+    content += "<input type='checkbox'  id='ntp' onchange='on_off_ntp()'/>";
   content += "<span class='slider round'></span></label></div></div>";
 
   content += "<form method='POST' action='/setting_ftp' class='login'><h1>تنظیمات ftp </h1><div class='onoffsw'><label class='labelsswitch'>سرور ftp : </label><label class='switch'>";
   if (ftp.state)
-    content += "<input type='checkbox' cheaked name='chkftp' id='chkftp'/>";
+    content += "<input type='checkbox' checked name='chkftp' id='chkftp'/>";
   else
     content += "<input type='checkbox'  name='chkftp' id='chkftp'/>";
 
   content += "<span class='slider round'></span></label></div><br/>";
-  content += "<input type='user' name='USERNAME' id='USERNAME'class='login-input' placeholder='نام کاربری'> <input type='pass' name='PASSWORD' id='PASSWORD'class='login-input' placeholder='کلمه عبور'><input type='submit' name='SUBMIT' value='ذخیر' class='login-submit'></form>";
+  content += "<input type='text' name='USERNAME' id='USERNAME'class='login-input' placeholder='نام کاربری' value="+ftp.Username+"> ";
+  content +="<input type='password' name='PASSWORD' id='PASSWORD'class='login-input' placeholder='کلمه عبور'value="+ftp.Password+">";
+  content +="<input type='submit' name='SUBMIT' value='ذخیر' class='login-submit'></form>";
 
   content += "<div class='login'>";
   content += "<form action='/restart' method='POST'>";
@@ -1633,11 +1673,9 @@ void handleSettingIP()
     server.send(301);
     return;
   }
-  if (server.hasArg("as-ip") && server.hasArg("as-gateway") && server.hasArg("as-subnet") && server.hasArg("as-dns")
-  && server.hasArg("ap-ssid")&& server.hasArg("ap-password")&& server.hasArg("a‌p-ip")&& server.hasArg("ap-subnet")
-  && server.hasArg("wifimode"))
+  if (server.hasArg("as-ip") && server.hasArg("as-gateway") && server.hasArg("as-subnet") && server.hasArg("as-dns") && server.hasArg("ap-ssid") && server.hasArg("ap-password") && server.hasArg("a‌p-ip") && server.hasArg("ap-subnet") && server.hasArg("wifimode"))
   {
-    
+
     network.AS_IP = String_to_IP(server.arg("as-ip"));
     network.AS_Gateway = String_to_IP(server.arg("as-gateway"));
     network.AS_Subnet = String_to_IP(server.arg("as-subnet"));
@@ -1648,16 +1686,15 @@ void handleSettingIP()
     network.AP_Subnet = String_to_IP(server.arg("ap-subnet"));
     network.AP_Ssid = server.arg("ap-ssid");
     network.AP_Password = server.arg("ap-password");
-    if(server.arg("wifimode")=="1")
-    network.mode =  Station;
-    if(server.arg("wifimode")=="2")
-    network.mode =  AccessPoint;
-    if(server.arg("wifimode")=="3")
-    network.mode =  both;
-   
+    if (server.arg("wifimode") == "1")
+      network.mode = Station;
+    if (server.arg("wifimode") == "2")
+      network.mode = AccessPoint;
+    if (server.arg("wifimode") == "3")
+      network.mode = both;
 
     write_wifi_config();
-
+    read_wifi_config();
     wifi_config();
   }
   String content = Tophtml();
@@ -1665,11 +1702,35 @@ void handleSettingIP()
   content += NavBar();
   content += " <form method='POST' class='login' action='/settingip'>";
   content += "<label for='wifimode'>Choose a car:</label>";
-  content +="<select class='login-input' id='wifimode' name='wifimode'>";
-  content +="<option value='1'>station</option>";
-  content +="<option value='2'>AccessPoint</option>";
-  content +="<option value='3'>Multi(AP&SA)</option>";
-  content +="</select>";
+  content += "<select class='login-input' id='wifimode' name='wifimode'>";
+  switch (network.mode)
+  {
+  case 1:
+  {
+    content += "<option value='1' selected>station</option>";
+    content += "<option value='2'>AccessPoint</option>";
+    content += "<option value='3'>Multi(AP&SA)</option>";
+    break;
+  }
+  case 2:
+  {
+    content += "<option value='1'>station</option>";
+    content += "<option value='2' selected >AccessPoint</option>";
+    content += "<option value='3'>Multi(AP&SA)</option>";
+    break;
+  }
+  case 3:
+  {
+    content += "<option value='1'>station</option>";
+    content += "<option value='2'>AccessPoint</option>";
+    content += "<option value='3' selected >Multi(AP&SA)</option>";
+    break;
+  }
+  }
+  content += "<option value='1'>station</option>";
+  content += "<option value='2'>AccessPoint</option>";
+  content += "<option value='3'>Multi(AP&SA)</option>";
+  content += "</select>";
   content += "<h1> تنظیمات شبکه سوییچ</h1>";
   content += "<input type='text' name='as-ip' class='login-input' placeholder='Static Ip' value=" + network.AS_IP.toString() + ">";
   content += "<input type='text' name='as-gateway' class='login-input' placeholder='Gateway' value=" + network.AS_Gateway.toString() + ">";
@@ -1679,12 +1740,49 @@ void handleSettingIP()
   content += "<h1> تنظیمات شبکه داخلی</h1>";
 
   content += "<input type='text' name='ap-ssid' class='login-input' placeholder='ssid' value=" + network.AP_Ssid + ">";
-  content += "<input type='text' name='ap-password' class='login-input' placeholder='password' value=" + network.AP_Password + ">";
+  content += "<input type='password' name='ap-password' class='login-input' placeholder='password' value=" + network.AP_Password + ">";
   content += "<input type='text' name='a‌p-ip' class='login-input' placeholder='Static Ip' value=" + network.AP_IP.toString() + ">";
   content += "<input type='text' name='ap-subnet' class='login-input' placeholder='Subnet' value=" + network.AP_Subnet.toString() + ">";
 
   content += "<input type='submit' name='SUBMIT' value='ذخیره' class='login-submit'></form>";
   content += "</body></html>";
+  server.send(200, "text/html", content);
+}
+void handleAdslModen()
+{
+  if (!is_authentified())
+  {
+    server.sendHeader("Location", "/login");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+  if (server.hasArg("Scancombo") && server.hasArg("PASSWORD"))
+  {
+    if (server.arg("Scancombo") == "No_Wifi")
+    {
+      network.AS_Ssid = server.arg("Scancombo");
+      network.AS_Password = server.arg("PASSWORD");
+      write_wifi_config();
+    }
+  }
+  String content = Tophtml();
+  content += "<body>";
+  content += NavBar();
+  content += " <form method='POST' class='login' action='/adslmodem'>";
+  content += "<h1>تنظیمات مودم</h1>";
+  content += "<select id='Scancombo' onclick='SSidFunction()' class='login-input' >";
+  if (network.AS_Ssid != "")
+    content += "<option  selected value=" + network.AS_Ssid + " >" + network.AS_Ssid + "</option>";
+  else
+    content += "<option value='No_Wifi'>شبکه موجود نیست .</option>";
+
+  content += "</select>";
+  content += "<input type='text' name='PASSWORD' class='login-input' placeholder='PASSWORD' value=" + network.AS_Password + ">";
+
+  content += "<input type='submit' name='SUBMIT' value='ذخیره' class='login-submit'></form>";
+  content += "</body>";
+  content += BotomHtml();
   server.send(200, "text/html", content);
 }
 
@@ -1695,17 +1793,17 @@ void WebServerConfig()
   server.on("/releStatus", Send_rele_status);
   server.on("/releChangeStatus", handle_ReleChangeState);
   server.on("/login", handleLogin);
-  server.on("/RTCtime", handletime);
+  server.on("/settime", handletime);
   server.on("/chkpass", handleChangePass);
   server.on("/setting", handleSetting);
   server.on("/restart", handle_restart);
   server.on("/on_off_ntp", handle_on_off_ntp);
-  server.on("/chkpass", handleChangePass);
   server.on("/setting_ftp", handlesetting_ftp);
   server.on("/defult", handledefultSetting);
   server.on("/setalerm", handleSetAlrem);
   server.on("/Scan", Scan_wifi);
   server.on("/settingip", handleSettingIP);
+  server.on("/adslmodem", handleAdslModen);
   server.onNotFound(handleNotFound);
   server.on("/inline", []() { server.send(200, "text/plain", "this works without need of authentification"); });
 
