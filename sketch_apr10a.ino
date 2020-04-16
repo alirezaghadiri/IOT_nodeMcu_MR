@@ -127,11 +127,6 @@ void SetDefultReleInfo()
 {
   for (int i = 0; i < 4; i++)
   {
-    /* int pin = ReturnRelePin(i);
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, 1);
-    RelesInfo[i].Rele = pin;
-    RelesInfo[i].Active = false;*/
     pinMode(RelesInfo[i].Rele, OUTPUT);
     digitalWrite(RelesInfo[i].Rele, 1);
   }
@@ -900,12 +895,16 @@ TimeDT GetTimeFormRTC()
   temp.Hour = datetime.Hour();
   temp.Minute = datetime.Minute();
   temp.Second = datetime.Second();
-
+  if (IssummerTime)
+    temp.Hour++;
   return temp;
 }
 void setTimeFormRTC()
 {
-  Rtc.SetDateTime(RtcDateTime(NowTime.Year, NowTime.Month, NowTime.Day, NowTime.Hour, NowTime.Minute, Rtc.GetDateTime().Second()));
+  if (IssummerTime)
+    Rtc.SetDateTime(RtcDateTime(NowTime.Year, NowTime.Month, NowTime.Day, NowTime.Hour - 1, NowTime.Minute, Rtc.GetDateTime().Second()));
+  else
+    Rtc.SetDateTime(RtcDateTime(NowTime.Year, NowTime.Month, NowTime.Day, NowTime.Hour, NowTime.Minute, Rtc.GetDateTime().Second()));
 }
 
 int ConvertMiladitoShamsi(int _Month)
@@ -951,6 +950,7 @@ TimeDT GetTime()
     temp = GetTimeFormNTP();
   else
     temp = GetTimeFormRTC();
+
   return temp;
 }
 
